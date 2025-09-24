@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Worry } from './types';
 import WorryTree from './components/WorryTree';
 import WorryMonster from './components/WorryMonster';
 import WorryInput from './components/WorryInput';
 import ComfortModal from './components/ComfortModal';
+import ShareModal from './components/ShareModal';
 
 const monsterColors = [
     '#ff7b7b', '#ffb07b', '#ffd97b', '#a6ff7b',
@@ -14,6 +15,34 @@ const App: React.FC = () => {
   const [worries, setWorries] = useState<Worry[]>([]);
   const [isComfortingMode, setIsComfortingMode] = useState<boolean>(false);
   const [selectedWorry, setSelectedWorry] = useState<Worry | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isSharedView, setIsSharedView] = useState(false);
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const treeData = params.get('tree');
+      if (treeData) {
+        // Unicode-safe Base64 decoding
+        const binaryString = atob(treeData);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        const decodedJson = new TextDecoder().decode(bytes);
+        
+        const initialWorries = JSON.parse(decodedJson);
+        setWorries(initialWorries);
+        setIsComfortingMode(true);
+        setIsSharedView(true);
+      }
+    } catch (error) {
+      console.error("Failed to parse shared worries:", error);
+      // Fallback to a clean state if parsing fails
+      setWorries([]);
+    }
+  }, []);
+
 
   const handleAddWorry = useCallback((text: string) => {
     const newWorry: Worry = {
@@ -75,26 +104,44 @@ const App: React.FC = () => {
           걱정 나무
         </h1>
         <p className="text-sm md:text-lg text-green-700 mt-2">
-          {isComfortingMode ? "위로하고 싶은 걱정 괴물을 눌러주세요." : "당신의 걱정을 나무에 매달아보세요."}
+          {isSharedView ? "친구가 남긴 걱정들을 위로해주세요." : isComfortingMode ? "위로하고 싶은 걱정 괴물을 눌러주세요." : "당신의 걱정을 나무에 매달아보세요."}
         </p>
       </div>
-
-      <div className="absolute bottom-0 left-0 p-6 md:p-8 w-full z-20 flex flex-col items-center justify-center gap-4 bg-gradient-to-t from-sky-100 via-sky-100/90 to-transparent">
-        <WorryInput onAddWorry={handleAddWorry} disabled={isComfortingMode} />
-        <button
-          onClick={handleToggleComfortMode}
-          className="px-6 py-3 rounded-full text-lg font-semibold transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg focus:outline-none focus:ring-4 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-br from-teal-500 to-green-600 hover:from-teal-600 hover:to-green-700 text-white focus:ring-teal-300"
-          disabled={worries.length === 0}
-        >
-          {isComfortingMode ? '걱정 추가하기' : '위로하기'}
-        </button>
-      </div>
+      
+      {!isSharedView && (
+        <div className="absolute bottom-0 left-0 p-6 md:p-8 w-full z-20 flex flex-col items-center justify-center gap-4 bg-gradient-to-t from-sky-100 via-sky-100/90 to-transparent">
+          <WorryInput onAddWorry={handleAddWorry} disabled={isComfortingMode} />
+          <div className="flex gap-4">
+            <button
+              onClick={handleToggleComfortMode}
+              className="px-6 py-3 rounded-full text-lg font-semibold transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg focus:outline-none focus:ring-4 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-br from-teal-500 to-green-600 hover:from-teal-600 hover:to-green-700 text-white focus:ring-teal-300"
+              disabled={worries.length === 0}
+            >
+              {isComfortingMode ? '걱정 추가하기' : '위로하기'}
+            </button>
+             <button
+              onClick={() => setIsShareModalOpen(true)}
+              className="px-6 py-3 rounded-full text-lg font-semibold transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg focus:outline-none focus:ring-4 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white focus:ring-blue-300"
+              disabled={worries.length === 0}
+            >
+              공유하기
+            </button>
+          </div>
+        </div>
+      )}
       
       {selectedWorry && (
         <ComfortModal
           worry={selectedWorry}
           onClose={handleCloseModal}
           onConfirm={handleConfirmComfort}
+        />
+      )}
+      
+      {isShareModalOpen && (
+        <ShareModal
+          worries={worries}
+          onClose={() => setIsShareModalOpen(false)}
         />
       )}
     </main>
