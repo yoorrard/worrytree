@@ -6,6 +6,8 @@ import WorryInput from './components/WorryInput';
 import ComfortModal from './components/ComfortModal';
 import ShareModal from './components/ShareModal';
 
+declare var pako: any;
+
 const monsterColors = [
     '#ff7b7b', '#ffb07b', '#ffd97b', '#a6ff7b',
     '#7bffb0', '#7bffff', '#7ba6ff', '#b07bff', '#ff7bff'
@@ -23,13 +25,15 @@ const App: React.FC = () => {
       const params = new URLSearchParams(window.location.search);
       const treeData = params.get('tree');
       if (treeData) {
-        // Unicode-safe Base64 decoding
+        // Decode from Base64
         const binaryString = atob(treeData);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
             bytes[i] = binaryString.charCodeAt(i);
         }
-        const decodedJson = new TextDecoder().decode(bytes);
+
+        // Decompress with pako
+        const decodedJson = pako.inflate(bytes, { to: 'string' });
         
         const initialWorries = JSON.parse(decodedJson);
         setWorries(initialWorries);
