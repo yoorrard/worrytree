@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
+import pako from 'pako';
 import { Worry } from '../types';
-
-declare var QRCode: any;
-declare var pako: any;
 
 interface ShareModalProps {
   worries: Worry[];
@@ -27,56 +26,27 @@ const ShareModal: React.FC<ShareModalProps> = ({ worries, onClose }) => {
       setError(null);
       setQrCodeDataUrl('');
       
-      let url = '';
       try {
         const jsonString = JSON.stringify(worries);
-        // Compress the JSON string using pako
         const compressed = pako.deflate(jsonString);
-        // Convert Uint8Array to binary string for btoa
         let binaryString = '';
         compressed.forEach((byte) => {
             binaryString += String.fromCharCode(byte);
         });
         const base64 = btoa(binaryString);
-        url = `${window.location.origin}${window.location.pathname}?tree=${encodeURIComponent(base64)}`;
+        const url = `${window.location.origin}${window.location.pathname}?tree=${encodeURIComponent(base64)}`;
         setShareUrl(url);
-      } catch (err) {
-        console.error("Failed to create share link:", err);
-        setError('공유 링크 생성 중 오류가 발생했습니다.');
-        setIsLoading(false);
-        return;
-      }
 
-      try {
-        const qrCodeLibrary = await new Promise((resolve, reject) => {
-          let attempts = 0;
-          const interval = setInterval(() => {
-            if (typeof QRCode !== 'undefined' && typeof pako !== 'undefined') {
-              clearInterval(interval);
-              resolve(QRCode);
-            } else {
-              attempts++;
-              if (attempts > 100) { // 10 seconds timeout
-                clearInterval(interval);
-                reject(new Error("QRCode library did not load in time."));
-              }
-            }
-          }, 100);
-        });
-
-        const dataUrl = await (qrCodeLibrary as any).toDataURL(url, {
+        const dataUrl = await QRCode.toDataURL(url, {
           width: 256,
           margin: 2,
           errorCorrectionLevel: 'L',
         });
         setQrCodeDataUrl(dataUrl);
-      } catch (generationError: any) {
-        console.error("QR Code generation failed:", generationError);
-        if (generationError.message.includes("did not load")) {
-            setError('QR 코드 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인 후 새로고침 해보세요.');
-        } else {
-            setError('QR 코드 생성에 실패했습니다. 내용이 너무 길 수 있습니다.');
-        }
+
+      } catch (err) {
+        console.error("QR Code generation failed:", err);
+        setError('QR코드 생성에 실패했습니다. 내용이 너무 길 수 있습니다.');
       } finally {
         setIsLoading(false);
       }

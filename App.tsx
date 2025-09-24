@@ -1,12 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import pako from 'pako';
 import { Worry } from './types';
 import WorryTree from './components/WorryTree';
 import WorryMonster from './components/WorryMonster';
 import WorryInput from './components/WorryInput';
 import ComfortModal from './components/ComfortModal';
 import ShareModal from './components/ShareModal';
-
-declare var pako: any;
 
 const monsterColors = [
     '#ff7b7b', '#ffb07b', '#ffd97b', '#a6ff7b',
@@ -21,30 +20,33 @@ const App: React.FC = () => {
   const [isSharedView, setIsSharedView] = useState(false);
 
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const treeData = params.get('tree');
-      if (treeData) {
-        // Decode from Base64
-        const binaryString = atob(treeData);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-        }
+    const loadSharedWorries = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const treeData = params.get('tree');
+        if (treeData) {
+          const decodedData = decodeURIComponent(treeData);
+          const binaryString = atob(decodedData);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+          }
 
-        // Decompress with pako
-        const decodedJson = pako.inflate(bytes, { to: 'string' });
-        
-        const initialWorries = JSON.parse(decodedJson);
-        setWorries(initialWorries);
-        setIsComfortingMode(true);
-        setIsSharedView(true);
+          const decodedJson = pako.inflate(bytes, { to: 'string' });
+          
+          const initialWorries = JSON.parse(decodedJson);
+          setWorries(initialWorries);
+          setIsComfortingMode(true);
+          setIsSharedView(true);
+        }
+      } catch (error) {
+        console.error("Failed to parse shared worries:", error);
+        alert("걱정 나무를 불러오는 데 실패했습니다. 링크가 올바른지 확인해주세요.");
+        setWorries([]);
       }
-    } catch (error) {
-      console.error("Failed to parse shared worries:", error);
-      // Fallback to a clean state if parsing fails
-      setWorries([]);
-    }
+    };
+
+    loadSharedWorries();
   }, []);
 
 
