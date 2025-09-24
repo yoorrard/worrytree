@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import pako from 'pako';
-import { Worry } from '../types';
+import { Worry, monsterColors } from '../types';
 
 interface ShareModalProps {
   worries: Worry[];
@@ -17,6 +16,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ worries, onClose }) => {
 
   useEffect(() => {
     if (worries.length === 0) {
+      setError("공유할 걱정이 없습니다.");
       setIsLoading(false);
       return;
     }
@@ -27,26 +27,58 @@ const ShareModal: React.FC<ShareModalProps> = ({ worries, onClose }) => {
       setQrCodeDataUrl('');
       
       try {
-        const jsonString = JSON.stringify(worries);
-        const compressed = pako.deflate(jsonString);
-        let binaryString = '';
-        compressed.forEach((byte) => {
-            binaryString += String.fromCharCode(byte);
+        // 1. Optimize data structure to a highly compact array
+        const simplifiedWorries = worries.map(w => {
+            const top = parseFloat(w.position.top);
+            const left = parseFloat(w.position.left);
+            const rotateMatch = w.position.transform.match(/-?[\d.]+/);
+            const rotate = rotateMatch ? parseFloat(rotateMatch[0]) : 0;
+            const colorIndex = monsterColors.indexOf(w.color);
+            return [
+              w.id,
+              w.text,
+              Math.round(top * 10) / 10,
+              Math.round(left * 10) / 10,
+              Math.round(rotate * 10) / 10,
+              colorIndex > -1 ? colorIndex : 0,
+            ];
         });
-        const base64 = btoa(binaryString);
-        const url = `${window.location.origin}${window.location.pathname}?tree=${encodeURIComponent(base64)}`;
+
+        // 2. Store data on jsonblob.com
+        const response = await fetch('https://jsonblob.com/api/jsonBlob', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify(simplifiedWorries),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to store worry data.');
+        }
+
+        // 3. Get the ID from the 'Location' header
+        const locationUrl = response.headers.get('Location');
+        if (!locationUrl) {
+          throw new Error('Could not get worry data ID.');
+        }
+        const worryId = locationUrl.split('/').pop();
+
+        // 4. Create the short URL
+        const url = `${window.location.origin}${window.location.pathname}?worryId=${worryId}`;
         setShareUrl(url);
 
+        // 5. Generate QR code from the short URL
         const dataUrl = await QRCode.toDataURL(url, {
           width: 256,
           margin: 2,
-          errorCorrectionLevel: 'L',
         });
         setQrCodeDataUrl(dataUrl);
 
       } catch (err) {
-        console.error("QR Code generation failed:", err);
-        setError('QR코드 생성에 실패했습니다. 내용이 너무 길 수 있습니다.');
+        console.error("Shareable generation failed:", err);
+        setError('공유 링크 생성에 실패했습니다. 잠시 후 다시 시도해주세요.');
       } finally {
         setIsLoading(false);
       }

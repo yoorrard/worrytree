@@ -1,16 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import pako from 'pako';
-import { Worry } from './types';
+import { Worry, monsterColors } from './types';
 import WorryTree from './components/WorryTree';
 import WorryMonster from './components/WorryMonster';
 import WorryInput from './components/WorryInput';
 import ComfortModal from './components/ComfortModal';
 import ShareModal from './components/ShareModal';
-
-const monsterColors = [
-    '#ff7b7b', '#ffb07b', '#ffd97b', '#a6ff7b',
-    '#7bffb0', '#7bffff', '#7ba6ff', '#b07bff', '#ff7bff'
-];
 
 const App: React.FC = () => {
   const [worries, setWorries] = useState<Worry[]>([]);
@@ -20,28 +14,36 @@ const App: React.FC = () => {
   const [isSharedView, setIsSharedView] = useState(false);
 
   useEffect(() => {
-    const loadSharedWorries = () => {
+    const loadSharedWorries = async () => {
       try {
         const params = new URLSearchParams(window.location.search);
-        const treeData = params.get('tree');
-        if (treeData) {
-          const decodedData = decodeURIComponent(treeData);
-          const binaryString = atob(decodedData);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
+        const worryId = params.get('worryId');
+        if (worryId) {
+          const response = await fetch(`https://jsonblob.com/api/jsonBlob/${worryId}`);
+          if (!response.ok) {
+            throw new Error('Failed to fetch worry data.');
           }
-
-          const decodedJson = pako.inflate(bytes, { to: 'string' });
+          const simplifiedWorries = await response.json();
           
-          const initialWorries = JSON.parse(decodedJson);
+          const initialWorries: Worry[] = simplifiedWorries.map((w: any[]) => ({
+            id: w[0],
+            text: w[1],
+            position: {
+              top: `${w[2]}%`,
+              left: `${w[3]}%`,
+              transform: `rotate(${w[4]}deg)`,
+            },
+            color: monsterColors[w[5]] || monsterColors[0],
+            isFalling: false,
+          }));
+
           setWorries(initialWorries);
           setIsComfortingMode(true);
           setIsSharedView(true);
         }
       } catch (error) {
         console.error("Failed to parse shared worries:", error);
-        alert("걱정 나무를 불러오는 데 실패했습니다. 링크가 올바른지 확인해주세요.");
+        alert("걱정 나무를 불러오는 데 실패했습니다. 링크가 올바르지 않거나 만료되었을 수 있습니다.");
         setWorries([]);
       }
     };
