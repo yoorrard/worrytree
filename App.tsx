@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Worry, monsterColors } from './types';
 import WorryTree from './components/WorryTree';
 import WorryMonster from './components/WorryMonster';
@@ -6,30 +6,22 @@ import WorryInput from './components/WorryInput';
 import ComfortModal from './components/ComfortModal';
 import ShareModal from './components/ShareModal';
 import Celebration from './components/Celebration';
+import WorrySummary from './components/WorrySummary';
 
-// Audio data is embedded directly as Base64 Data URIs to prevent any loading errors.
-const COMFORT_SOUND_DATA_URL = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU2LjQwLjEwMQAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIwAAHwAATEFNRSAzLjk5LjUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OETAAAAAAAAAAAAAAAAAAAAAABkANgA/AAAAAAAAAABRAAALEBQQgAAGRALgAAGRAAAAABH4AAAEiAAAAAEvgAAGRAAAAAPoAGxwcHDg4Ojo6Pj4+QEBAQ0NDRERER0dHSEhISkpKUlJSVVVVWFhYWVlZWlpaW1tbXFxcXV1dXl5eX19fYGBgYmJiY2NjZGRkZWVlZ2dnaGhoaWlpampqa2trbGxsbW1tbm5ub29vcHBwcXFxcnJyc3NzdHR0dXV1dnZ2d3d3eHh4eXl5enp6e3t7fHx8fX19fn5+f39/gICAgYGBgoKCg4ODhISEhYWFhoaGh4eHiIiIiYmJioqKi4uLjIyMjY2Njo6Ojw8PEJCQkZGRkpKSk5OTlJSUlZWVlpaWl5eXmJiYmZmZmpqam5ubnJycnZ2dnp6en5+foKCgoaGhoqKio6OjpKSkpKSkpampqqqqrKysra2trq6ur6+vsLCwsbGxsrKys7OztLS0tbW1t7e3uLi4ubm5urq6u7u7vLy8vb29vr6+v7+/wMDAwcHBwsLCw8PDxMTExcXFxsbGx8fHyMjIycnJysrKy8vLzMzMzc3Nzs7Oz8/P0NDQ0dHR0tLS09PT1NTU1dXV1tbW19fX2NjY2dnZ2tra29vb3Nzc3d3d3t7e39/f4ODg4eHh4uLi4+Pj5OTk5eXl5ubm5+fn6Ojo6enp6urq6+vr7Ozs7e3t7u7u7+/v8PDw8fHx8vLy8/Pz9PT09fX19vb29/f3+Pj4+fn5+vr6+/v7/Pz8/f39/v7+////////////g4ODhYWFhoaGh4eHiIiIiYmJioqKi4uLjIyMjY2Njo6Ojw8PEJCQkZGRkpKSk5OTlJSUlZWVlpaWl5eXmJiYmZmZmpqam5ubnJycnZ2dnp6en5+foKCgoaGhoqKio6OjpKSkpKSkpampqqqqrKysra2trq6ur6+vsLCwsbGxsrKys7OztLS0tbW1t7e3uLi4ubm5urq6u7u7vLy8vb29vr6+v7+/wMDAwcHBwsLCw8PDxMTExcXFxsbGx8fHyMjIycnJysrKy8vLzMzMzc3Nzs7Oz8/P0NDQ0dHR0tLS09PT1NTU1dXV1tbW19fX2NjY2dnZ2tra29vb3Nzc3d3d3t7e39/f4ODg4eHh4uLi4+Pj5OTk5eXl5ubm5+fn6Ojo6enp6urq6+vr7Ozs7e3t7u7u7+/v8PDw8fHx8vLy8/Pz9PT09fX19vb29/f3+Pj4+fn5+vr6+/v7/Pz8/f39/v7+////////AAAAAAAAAAAAAP/OEZQAAAAAAAAA/wA3AD4AAAAAAABRAAALEBQQgAAGRALgAAGRAAAAABH4AAAEiAAAAAEvgAAGRAAAAAPoAGxwcHDg4Ojo6Pj4+QEBAQ0NDRERER0dHSEhISkpKUlJSVVVVWFhYWVlZWlpaW1tbXFxcXV1dXl5eX19fYGBgYmJiY2NjZGRkZWVlZ2dnaGhoaWlpampqa2trbGxsbW1tbm5ub29vcHBwcXFxcnJyc3NzdHR0dXV1dnZ2d3d3eHh4eXl5enp6e3t7fHx8fX19fn5+f39/gICAgYGBgoKCg4ODhISEhYWFhoaGh4eHiIiIiYmJioqKi4uLjIyMjY2Njo6Ojw8PEJCQkZGRkpKSk5OTlJSUlZWVlpaWl5eXmJiYmZmZmpqam5ubnJycnZ2dnp6en5+foKCgoaGhoqKio6OjpKSkpKSkpampqqqqrKysra2trq6ur6+vsLCwsbGxsrKys7OztLS0tbW1t7e3uLi4ubm5urq6u7u7vLy8vb29vr6+v7+/wMDAwcHBwsLCw8PDxMTExcXFxsbGx8fHyMjIycnJysrKy8vLzMzMzc3Nzs7Oz8/P0NDQ0dHR0tLS09PT1NTU1dXV1tbW19fX2NjY2dnZ2tra29vb3Nzc3d3d3t7e39/f4ODg4eHh4uLi4+Pj5OTk5eXl5ubm5+fn6Ojo6enp6urq6+vr7Ozs7e3t7u7u7+/v8PDw8fHx8vLy8/Pz9PT09fX19vb29/f3+Pj4+fn5+vr6+/v7/Pz8/f39/v7+////////////////////g4ODhYWFhoaGh4eHiIiIiYmJioqKi4uLjIyMjY2Njo6Ojw8PEJCQkZGRkpKSk5OTlJSUlZWVlpaWl5eXmJiYmZmZmpqam5ubnJycnZ2dnp6en5+foKCgoaGhoqKio6OjpKSkpKSkpampqqqqrKysra2trq6ur6+vsLCwsbGxsrKys7OztLS0tbW1t7e3uLi4ubm5urq6u7u7vLy8vb29vr6+v7+/wMDAwcHBwsLCw8PDxMTExcXFxsbGx8fHyMjIycnJysrKy8vLzMzMzc3Nzs7Oz8/P0NDQ0dHR0tLS09PT1NTU1dXV1tbW19fX2NjY2dnZ2tra29vb3Nzc3d3d3t7e39/f4ODg4eHh4uLi4+Pj5OTk5eXl5ubm5+fn6Ojo6enp6urq6+vr7Ozs7e3t7u7u7+/v8PDw8fHx8vLy8/Pz9PT09fX19vb29/f3+Pj4+fn5+vr6+/v7/Pz8/f39/v7+////////////AAAAAAAAAAD/zhGQAAADSAAAAQwAAABJTEFNRSAzLjk5LjUAAA==';
-const CELEBRATION_SOUND_DATA_URL = 'data:audio/mpeg;base64,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';
+interface ClearedWorry {
+  worryText: string;
+  comfortText: string;
+}
 
 const App: React.FC = () => {
   const [worries, setWorries] = useState<Worry[]>([]);
+  const [clearedWorries, setClearedWorries] = useState<ClearedWorry[]>([]);
   const [isComfortingMode, setIsComfortingMode] = useState<boolean>(false);
   const [selectedWorry, setSelectedWorry] = useState<Worry | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSharedView, setIsSharedView] = useState(false);
   const [allWorriesCleared, setAllWorriesCleared] = useState(false);
 
-  const comfortSoundRef = useRef<HTMLAudioElement | null>(null);
-  const celebrationSoundRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    comfortSoundRef.current = new Audio(COMFORT_SOUND_DATA_URL);
-    comfortSoundRef.current.volume = 0.5;
-
-    celebrationSoundRef.current = new Audio(CELEBRATION_SOUND_DATA_URL);
-    celebrationSoundRef.current.volume = 0.7;
-  }, []);
-  
   useEffect(() => {
     const loadSharedWorries = async () => {
       try {
@@ -96,6 +88,7 @@ const App: React.FC = () => {
   const handleToggleComfortMode = () => {
     if (allWorriesCleared) {
       setAllWorriesCleared(false);
+      setClearedWorries([]);
       setIsComfortingMode(false);
     } else {
       setIsComfortingMode(prev => !prev);
@@ -112,10 +105,10 @@ const App: React.FC = () => {
     setSelectedWorry(null);
   };
 
-  const handleConfirmComfort = (worryId: number) => {
-    if (comfortSoundRef.current) {
-      comfortSoundRef.current.currentTime = 0;
-      comfortSoundRef.current.play().catch(e => console.error("Error playing comfort sound:", e));
+  const handleConfirmComfort = (worryId: number, comfortText: string) => {
+    const worryToClear = worries.find(w => w.id === worryId);
+    if (worryToClear) {
+      setClearedWorries(prev => [...prev, { worryText: worryToClear.text, comfortText }]);
     }
     
     setWorries(prevWorries =>
@@ -130,10 +123,6 @@ const App: React.FC = () => {
         const newWorries = prevWorries.filter(w => w.id !== worryId);
         if (newWorries.length === 0 && prevWorries.length > 0) {
           setAllWorriesCleared(true);
-           if (celebrationSoundRef.current) {
-            celebrationSoundRef.current.currentTime = 0;
-            celebrationSoundRef.current.play().catch(e => console.error("Error playing celebration sound:", e));
-          }
         }
         return newWorries;
       });
@@ -142,7 +131,23 @@ const App: React.FC = () => {
 
   return (
     <main className="relative w-screen h-screen overflow-hidden bg-sky-100 text-slate-800 flex items-center justify-center">
-      {allWorriesCleared && <Celebration />}
+      {allWorriesCleared && (
+        <>
+          <Celebration />
+          <WorrySummary 
+            clearedWorries={clearedWorries} 
+            isSharedView={isSharedView}
+            onClose={() => {
+                setAllWorriesCleared(false);
+                setClearedWorries([]);
+                if (!isSharedView) {
+                    setIsComfortingMode(false);
+                }
+            }}
+          />
+        </>
+      )}
+
       <WorryTree>
         {worries.map(worry => (
           <WorryMonster
@@ -163,7 +168,7 @@ const App: React.FC = () => {
         </p>
       </div>
       
-      {!isSharedView && (
+      {!isSharedView && !allWorriesCleared && (
         <div className="absolute bottom-0 left-0 p-6 md:p-8 w-full z-20 flex flex-col items-center justify-center gap-4 bg-gradient-to-t from-sky-100 via-sky-100/90 to-transparent">
           <WorryInput onAddWorry={handleAddWorry} disabled={isComfortingMode || allWorriesCleared} />
           <div className="flex gap-4">

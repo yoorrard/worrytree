@@ -4,14 +4,14 @@ import { Worry } from '../types';
 interface ComfortModalProps {
   worry: Worry;
   onClose: () => void;
-  onConfirm: (worryId: number) => void;
+  onConfirm: (worryId: number, comfortText: string) => void;
 }
 
 const ComfortModal: React.FC<ComfortModalProps> = ({ worry, onClose, onConfirm }) => {
   const [comfortingMessage, setComfortingMessage] = useState('');
 
   const handleConfirm = () => {
-    onConfirm(worry.id);
+    onConfirm(worry.id, comfortingMessage);
   };
 
   return (
