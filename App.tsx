@@ -18,8 +18,18 @@ const App: React.FC = () => {
       try {
         const params = new URLSearchParams(window.location.search);
         const worryId = params.get('worryId');
+        const store = params.get('store');
+
         if (worryId) {
-          const response = await fetch(`https://jsonblob.com/api/jsonBlob/${worryId}`);
+          let response;
+          if (store === 'kv') {
+            const bucket = 'worry-tree-app-v1';
+            response = await fetch(`https://kvstore.io/api/${bucket}/${worryId}`);
+          } else {
+            // Fallback to original jsonblob method for old links
+            response = await fetch(`https://jsonblob.com/api/jsonBlob/${worryId}`);
+          }
+          
           if (!response.ok) {
             throw new Error('Failed to fetch worry data.');
           }

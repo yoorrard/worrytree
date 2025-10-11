@@ -55,21 +55,27 @@ const ShareModal: React.FC<ShareModalProps> = ({ worries, onClose }) => {
         });
 
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to store worry data on jsonblob:', response.status, errorText);
           throw new Error('Failed to store worry data.');
         }
 
-        // 3. Get the ID from the 'Location' header
-        const locationUrl = response.headers.get('Location');
-        if (!locationUrl) {
-          throw new Error('Could not get worry data ID.');
+        // 3. Extract the ID from the 'Location' header
+        const blobUrl = response.headers.get('Location');
+        if (!blobUrl) {
+            throw new Error("Could not get blob URL from response header.");
         }
-        const worryId = locationUrl.split('/').pop();
+        const worryId = blobUrl.split('/').pop();
 
-        // 4. Create the short URL
+        if (!worryId) {
+             throw new Error("Could not parse worry ID from blob URL.");
+        }
+        
+        // 4. Create the share URL (without the 'store' parameter)
         const url = `${window.location.origin}${window.location.pathname}?worryId=${worryId}`;
         setShareUrl(url);
 
-        // 5. Generate QR code from the short URL
+        // 5. Generate QR code from the share URL
         const dataUrl = await QRCode.toDataURL(url, {
           width: 256,
           margin: 2,

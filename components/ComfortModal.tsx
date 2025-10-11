@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Worry } from '../types';
+import { generateComfortingMessage } from '../services/geminiService';
 
 interface ComfortModalProps {
   worry: Worry;
@@ -9,9 +10,18 @@ interface ComfortModalProps {
 
 const ComfortModal: React.FC<ComfortModalProps> = ({ worry, onClose, onConfirm }) => {
   const [comfortingMessage, setComfortingMessage] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleConfirm = () => {
     onConfirm(worry.id);
+  };
+  
+  const handleGenerateComfort = async () => {
+    setIsGenerating(true);
+    setComfortingMessage("따뜻한 위로를 찾고 있어요...");
+    const message = await generateComfortingMessage(worry.text);
+    setComfortingMessage(message);
+    setIsGenerating(false);
   };
 
   return (
@@ -26,13 +36,23 @@ const ComfortModal: React.FC<ComfortModalProps> = ({ worry, onClose, onConfirm }
           <textarea
             value={comfortingMessage}
             onChange={(e) => setComfortingMessage(e.target.value)}
-            placeholder="따뜻한 위로의 말을 직접 적어주세요..."
+            placeholder="따뜻한 위로의 말을 직접 적거나 AI의 위로를 받아보세요."
             className="w-full h-full bg-transparent text-slate-700 text-center text-lg resize-none focus:outline-none placeholder-gray-500"
             rows={4}
           />
         </div>
 
-        <div className="flex gap-4 mt-6">
+        <div className="flex justify-center my-4">
+            <button
+              onClick={handleGenerateComfort}
+              disabled={isGenerating}
+              className="px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ease-in-out transform hover:scale-105 shadow-md focus:outline-none focus:ring-4 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-br from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white focus:ring-purple-300"
+            >
+              {isGenerating ? '생성 중...' : 'AI 위로 받기'}
+            </button>
+        </div>
+
+        <div className="flex gap-4 mt-2">
           <button
             onClick={onClose}
             className="flex-1 px-4 py-3 rounded-full font-semibold transition-colors duration-300 bg-slate-200 hover:bg-slate-300 text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
