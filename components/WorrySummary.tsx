@@ -25,32 +25,46 @@ const WorrySummary: React.FC<WorrySummaryProps> = ({ clearedWorries, isSharedVie
   const handleDownloadPdf = async () => {
     const { jsPDF } = window.jspdf;
     const html2canvas = window.html2canvas;
-    const content = document.getElementById('worry-summary-content');
+    const originalContent = document.getElementById('worry-summary-content');
 
-    if (!jsPDF || !html2canvas || !content) {
+    if (!jsPDF || !html2canvas || !originalContent) {
       alert("PDF 생성에 필요한 요소를 찾을 수 없습니다.");
       return;
     }
 
     setIsGeneratingPdf(true);
-    
-    // Store original styles to restore them later
-    const originalMaxHeight = content.style.maxHeight;
-    const originalOverflowY = content.style.overflowY;
 
-    // Temporarily modify styles to ensure the entire content is visible for capture
-    content.style.maxHeight = 'none';
-    content.style.overflowY = 'visible';
+    // Create an off-screen container for a clone of the content.
+    // This isolates the capture process from the live DOM, preventing layout issues.
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.top = '0px';
+    // Set a fixed width based on the original element to ensure consistent layout.
+    container.style.width = `${originalContent.offsetWidth}px`;
+    container.style.backgroundColor = '#f8fafc'; // Match the capture background
+
+    const clone = originalContent.cloneNode(true) as HTMLElement;
+    
+    // Apply styles to the clone for optimal and predictable rendering.
+    clone.style.fontFamily = 'Arial, sans-serif'; // Use a web-safe font.
+    clone.style.maxHeight = 'none'; // Ensure all content is visible.
+    clone.style.overflowY = 'visible';
+
+    container.appendChild(clone);
+    document.body.appendChild(container);
 
     try {
-      // Wait for fonts to be loaded before capturing the canvas
-      await document.fonts.ready;
-
-      const canvas = await html2canvas(content, { 
+      // Run html2canvas on the stable, off-screen clone.
+      const canvas = await html2canvas(clone, { 
           scale: 2,
-          backgroundColor: '#f8fafc', // slate-50
-          useCORS: true, // Handle external resources like Google Fonts
+          useCORS: true,
+          backgroundColor: '#f8fafc',
       });
+
+      // Once captured, the off-screen elements are no longer needed.
+      document.body.removeChild(container);
+
       const imgData = canvas.toDataURL('image/png');
       const imgWidth = 210; // A4 width in mm
       const pageHeight = 297; // A4 height in mm
@@ -73,10 +87,11 @@ const WorrySummary: React.FC<WorrySummaryProps> = ({ clearedWorries, isSharedVie
     } catch (error) {
       console.error("PDF generation failed:", error);
       alert("PDF를 생성하는 데 실패했습니다.");
+      // Ensure the container is removed even if an error occurs.
+      if (document.body.contains(container)) {
+        document.body.removeChild(container);
+      }
     } finally {
-      // Restore original styles after capture is complete
-      content.style.maxHeight = originalMaxHeight;
-      content.style.overflowY = originalOverflowY;
       setIsGeneratingPdf(false);
     }
   };
