@@ -7,6 +7,7 @@ import ComfortModal from './components/ComfortModal';
 import ShareModal from './components/ShareModal';
 import Celebration from './components/Celebration';
 import WorrySummary from './components/WorrySummary';
+import LZString from 'lz-string';
 
 interface ClearedWorry {
   worryText: string;
@@ -26,24 +27,39 @@ const App: React.FC = () => {
     const loadSharedWorries = async () => {
       try {
         const params = new URLSearchParams(window.location.search);
+        const dataParam = params.get('data');
         const worryId = params.get('worryId');
         const store = params.get('store');
 
-        if (worryId) {
+        let simplifiedWorries: any[] | null = null;
+
+        if (dataParam) {
+           // New method: Decompress from URL
+           try {
+               const decompressed = LZString.decompressFromEncodedURIComponent(dataParam);
+               if (decompressed) {
+                   simplifiedWorries = JSON.parse(decompressed);
+               }
+           } catch (e) {
+               console.error("Failed to decompress data", e);
+           }
+        } else if (worryId) {
+          // Legacy method: Fetch from store
           let response;
           if (store === 'kv') {
             const bucket = 'worry-tree-app-v1';
             response = await fetch(`https://kvstore.io/api/${bucket}/${worryId}`);
           } else {
-            // Fallback to original jsonblob method for old links
             response = await fetch(`https://jsonblob.com/api/jsonBlob/${worryId}`);
           }
           
           if (!response.ok) {
             throw new Error('Failed to fetch worry data.');
           }
-          const simplifiedWorries = await response.json();
-          
+          simplifiedWorries = await response.json();
+        }
+
+        if (simplifiedWorries) {
           const initialWorries: Worry[] = simplifiedWorries.map((w: any[]) => ({
             id: w[0],
             text: w[1],

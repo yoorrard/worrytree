@@ -12,7 +12,8 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "@google/genai": "^1.20.0",
-    "qrcode": "1.5.3"
+    "qrcode": "1.5.3",
+    "lz-string": "1.5.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
