@@ -60,15 +60,15 @@ const App: React.FC = () => {
         }
 
         if (simplifiedWorries) {
-          const initialWorries: Worry[] = simplifiedWorries.map((w: any[]) => ({
-            id: w[0],
-            text: w[1],
+          const initialWorries: Worry[] = simplifiedWorries.map((w: any[], index: number) => ({
+            id: Date.now() + index, // Generate new ID for session
+            text: w[0],
             position: {
-              top: `${w[2]}%`,
-              left: `${w[3]}%`,
-              transform: `rotate(${w[4]}deg)`,
+              top: `${w[1]}%`,
+              left: `${w[2]}%`,
+              transform: `rotate(${w[3]}deg)`,
             },
-            color: monsterColors[w[5]] || monsterColors[0],
+            color: monsterColors[w[4]] || monsterColors[0],
             isFalling: false,
           }));
 
