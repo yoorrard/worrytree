@@ -46,13 +46,12 @@ export const getAppBaseUrl = (): string => {
 /** 걱정 목록을 압축해 공유 URL을 만듭니다. */
 export const buildShareUrl = (worries: Worry[]): string => {
   const packed = worries.slice(0, MAX_SHARED_WORRIES).map(w => {
-    const rotateMatch = w.position.transform.match(/-?[\d.]+/);
     const colorIndex = monsterColors.indexOf(w.color);
     return [
       w.text.slice(0, MAX_WORRY_TEXT_LENGTH),
-      Math.round(parseFloat(w.position.top)) || 0,
-      Math.round(parseFloat(w.position.left)) || 0,
-      rotateMatch ? Math.round(parseFloat(rotateMatch[0])) : 0,
+      Math.round(w.position.top),
+      Math.round(w.position.left),
+      Math.round(w.position.rotate),
       colorIndex > -1 ? colorIndex : 0,
     ];
   });
@@ -86,7 +85,7 @@ const unpackWorry = (entry: unknown): Worry | null => {
   return {
     id: createWorryId(),
     text: text.slice(0, MAX_WORRY_TEXT_LENGTH),
-    position: { top: `${top}%`, left: `${left}%`, transform: `rotate(${rotate}deg)` },
+    position: { top, left, rotate },
     color: monsterColors[colorIndex],
     isFalling: false,
   };

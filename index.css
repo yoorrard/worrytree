@@ -19,9 +19,12 @@ body {
   animation: hang 4s ease-in-out infinite;
 }
 
+/* transform 대신 독립 속성 scale 을 씁니다.
+   CSS 애니메이션은 인라인 style 보다 우선하기 때문에, 여기서 transform 을 건드리면
+   요소에 걸어둔 transform(예: 괴물을 좌표 중심에 맞추는 translate)이 통째로 무시됩니다. */
 @keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.5); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; scale: 0.5; }
+  to { opacity: 1; scale: 1; }
 }
 .animate-fadeIn {
   animation: fadeIn 0.5s ease-out forwards;

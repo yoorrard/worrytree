@@ -30,7 +30,7 @@ const OUTPUT = path.join(ASSETS_DIR, 'tree.webp');
 const META_OUTPUT = path.join(ASSETS_DIR, 'tree.meta.json');
 
 /** 고해상도 화면까지 선명하게 덮는 최대 변 길이. */
-const MAX_EDGE = 1600;
+const MAX_EDGE = 1920;
 /** 이 값보다 밝으면 배경으로 간주 (--remove-white). */
 const WHITE_THRESHOLD = 243;
 
@@ -51,7 +51,7 @@ function isOptionValue(a) {
 const shouldTrim = args.includes('--trim');
 const removeWhite = args.includes('--remove-white');
 const qualityIdx = args.indexOf('--quality');
-const quality = qualityIdx > -1 ? Number(args[qualityIdx + 1]) : 82;
+const quality = qualityIdx > -1 ? Number(args[qualityIdx + 1]) : 80;
 const canopyIdx = args.indexOf('--canopy');
 const canopyArg = canopyIdx > -1 ? args[canopyIdx + 1] : null;
 
@@ -98,10 +98,11 @@ async function makeWhiteTransparent(buffer) {
     .toBuffer();
 }
 
-let working = await source.ensureAlpha().png().toBuffer();
-if (removeWhite) working = await makeWhiteTransparent(working);
-
-let pipeline = sharp(working);
+// 흰 배경을 지울 때만 픽셀을 직접 만져야 하므로 무손실 중간 변환을 거칩니다.
+// 그렇지 않은 경우 원본에서 바로 변환해야 재압축 손실과 용량 낭비가 없습니다.
+let pipeline = removeWhite
+  ? sharp(await makeWhiteTransparent(await source.ensureAlpha().png().toBuffer()))
+  : sharp(inputPath, { animated: false }).ensureAlpha();
 if (shouldTrim) pipeline = pipeline.trim();
 
 const resized = await pipeline

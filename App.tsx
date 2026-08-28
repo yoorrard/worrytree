@@ -106,9 +106,9 @@ const App: React.FC = () => {
       text: text.slice(0, MAX_WORRY_TEXT_LENGTH),
       isFalling: false,
       position: {
-        top: `${Math.round(spot.top)}%`,
-        left: `${Math.round(spot.left)}%`,
-        transform: `rotate(${Math.round(randomBetween(-15, 15))}deg)`,
+        top: Math.round(spot.top),
+        left: Math.round(spot.left),
+        rotate: Math.round(randomBetween(-15, 15)),
       },
       color: monsterColors[Math.floor(Math.random() * monsterColors.length)],
     };

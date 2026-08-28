@@ -2,7 +2,9 @@
 export interface Worry {
   id: string;
   text: string;
-  position: { top: string; left: string; transform: string };
+  /** 무대 기준 위치(%)와 기울기(도). 예전에는 'rotate(7deg)' 같은 문자열이라
+   *  쓸 때마다 정규식으로 다시 뜯어야 했습니다. */
+  position: { top: number; left: number; rotate: number };
   isFalling: boolean;
   color: string;
 }
@@ -33,29 +35,32 @@ export interface TreeShape {
   canopy: { cx: number; cy: number; rx: number; ry: number };
 }
 
-/**
- * 앱이 쓰는 무대의 가로:세로 비율. **기기와 무관하게 항상 같습니다.**
- *
- * 걱정 괴물의 좌표(%)가 이 무대를 기준으로 저장되므로, 화면 크기에 따라
- * 비율이 바뀌면 같은 공유 링크가 기기마다 다른 그림이 되어 버립니다.
- *
- * 4:3인 이유: 나무 그림은 대개 가로로 넓지만(16:9 등) 휴대폰 화면은 세로로 깁니다.
- * 그림 비율을 그대로 쓰면 휴대폰에서 나무가 납작한 띠가 되고, 정사각형에 가깝게
- * 하면 넓은 그림의 좌우가 너무 많이 잘립니다. 4:3이 그 사이의 균형점입니다.
- */
-export const STAGE_ASPECT = 4 / 3;
-
-/**
- * 기본 SVG 나무의 모양. 무대와 같은 비율로 그렸기 때문에 좌표 변환이 필요 없습니다.
- * (사용자가 넣은 그림은 비율이 다를 수 있어 services/treeShape.ts 에서 변환합니다.)
- */
+/** 기본 SVG 나무의 모양. 그림을 넣으면 그 그림의 값으로 대체됩니다. */
 export const DEFAULT_TREE_SHAPE: TreeShape = {
-  aspect: STAGE_ASPECT,
+  aspect: 4 / 3,
   canopy: { cx: 50, cy: 34, rx: 30, ry: 24 },
 };
 
-/** 괴물 크기. 나무와 함께 커지되, 손가락으로 누를 수 있는 크기는 지킵니다. */
-export const MONSTER_SIZE_CSS = 'clamp(42px, 7%, 92px)';
+/** 화면 좌우 끝에 남겨둘 최소 여백(양쪽 합, px). */
+export const STAGE_EDGE_PAD_PX = 24;
+
+/**
+ * 나무를 화면 폭의 몇 배까지 키울지.
+ *
+ * 좁은 화면에서 나무를 화면에 맞춰 줄이면 아래쪽에 납작하게 깔려 휑합니다.
+ * 대신 나무를 크게 키워 좌우로 넘치게 두면 화면이 꽉 차 보입니다.
+ * 너무 키우면 나무 윤곽이 사라져 잎사귀 벽처럼 보이므로 이쯤에서 멈춥니다.
+ */
+export const MAX_STAGE_OVERFLOW = 2.75;
+
+/**
+ * 괴물 크기 — 무대 폭에 대한 비율.
+ * 나무와 항상 같은 비율로 커지고 작아져서, 어느 화면에서 보든 나무 위 괴물의
+ * 크기감이 같습니다. 다만 손가락으로 누를 수 있는 최소 크기는 지킵니다.
+ */
+export const MONSTER_SIZE_RATIO = 0.065;
+export const MONSTER_MIN_PX = 40;
+export const MONSTER_SIZE_CSS = `max(${MONSTER_MIN_PX}px, ${MONSTER_SIZE_RATIO * 100}%)`;
 
 /** 괴물이 떨어지는 애니메이션 길이(ms). CSS transition 시간과 반드시 같아야 합니다. */
 export const FALL_DURATION_MS = 2000;

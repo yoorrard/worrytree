@@ -1,5 +1,6 @@
 import React from 'react';
 import { Worry, FALL_DURATION_MS, MONSTER_SIZE_CSS } from '../types';
+import { canopy } from '../services/treeShape';
 import { MonsterIcon } from './icons';
 
 interface WorryMonsterProps {
@@ -20,9 +21,14 @@ interface WorryMonsterProps {
 const WorryMonster: React.FC<WorryMonsterProps> = ({ worry, isComfortingMode, onClick }) => {
   const isClickable = isComfortingMode && !worry.isFalling;
 
+  // 나무가 화면 밖으로 넘칠 때는 괴물이 잘리지 않도록 가로 위치를 나뭇잎 중심
+  // 쪽으로 모읍니다(--canopy-squeeze). 넘치지 않으면 1이라 원래 자리 그대로입니다.
+  const offsetFromCenter = worry.position.left - canopy.cx;
+  const left = `calc(${canopy.cx}% + var(--canopy-squeeze, 1) * ${offsetFromCenter}%)`;
+
   const positionStyle: React.CSSProperties = {
-    top: worry.isFalling ? '125%' : worry.position.top,
-    left: worry.position.left,
+    top: worry.isFalling ? '125%' : `${worry.position.top}%`,
+    left,
     // 좌표가 괴물의 '중심'을 가리키도록 맞춥니다. 나뭇잎 가장자리에 매달린
     // 괴물이 잘리지 않습니다.
     transform: 'translate(-50%, -50%)',
@@ -37,8 +43,8 @@ const WorryMonster: React.FC<WorryMonsterProps> = ({ worry, isComfortingMode, on
 
   const tiltStyle: React.CSSProperties = {
     transform: worry.isFalling
-      ? `${worry.position.transform} rotate(180deg) scale(0.5)`
-      : worry.position.transform,
+      ? `rotate(${worry.position.rotate + 180}deg) scale(0.5)`
+      : `rotate(${worry.position.rotate}deg)`,
     transition: `transform ${FALL_DURATION_MS}ms ease-in-out`,
   };
 

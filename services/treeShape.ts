@@ -1,4 +1,11 @@
-import { DEFAULT_TREE_SHAPE, STAGE_ASPECT, TreeShape } from '../types';
+import {
+  DEFAULT_TREE_SHAPE,
+  MAX_STAGE_OVERFLOW,
+  MONSTER_MIN_PX,
+  MONSTER_SIZE_RATIO,
+  STAGE_EDGE_PAD_PX,
+  TreeShape,
+} from '../types';
 
 /**
  * 나무 그림과 그 모양 정보를 빌드 시점에 찾아옵니다.
@@ -37,7 +44,7 @@ const meta = Object.values(metaModules)[0];
 
 const isPositive = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
 
-const imageShape: TreeShape = {
+export const treeShape: TreeShape = {
   aspect: isPositive(meta?.aspect) ? meta.aspect : DEFAULT_TREE_SHAPE.aspect,
   canopy: {
     cx: meta?.canopy?.cx ?? DEFAULT_TREE_SHAPE.canopy.cx,
@@ -47,59 +54,62 @@ const imageShape: TreeShape = {
   },
 };
 
-/**
- * 그림 기준 좌표를 무대 기준 좌표로 옮깁니다.
- *
- * 그림은 무대를 빈틈없이 채우도록(object-fit: cover) 그려지므로, 그림과 무대의
- * 비율이 다르면 가로나 세로가 균등하게 잘려 나갑니다. 그만큼 나뭇잎의 위치와
- * 크기도 달라지기 때문에, 괴물을 매달기 전에 좌표를 바꿔줘야 합니다.
- */
-const toStageCoords = (shape: TreeShape): TreeShape['canopy'] => {
-  const { canopy, aspect } = shape;
-  if (Math.abs(aspect - STAGE_ASPECT) < 0.001) return canopy;
+/** 괴물이 매달릴 수 있는 나뭇잎 타원 (무대 기준 %). */
+export const canopy = treeShape.canopy;
 
-  if (aspect > STAGE_ASPECT) {
-    // 그림이 무대보다 가로로 넓다 → 좌우가 잘린다
-    const visible = STAGE_ASPECT / aspect;
-    const cut = (1 - visible) / 2;
-    return {
-      ...canopy,
-      cx: ((canopy.cx / 100 - cut) / visible) * 100,
-      rx: canopy.rx / visible,
-    };
-  }
-  // 그림이 무대보다 세로로 길다 → 위쪽이 잘린다.
-  // (아래쪽을 기준으로 맞추므로 줄기와 땅은 절대 잘리지 않습니다.)
-  const visible = aspect / STAGE_ASPECT;
-  const cut = 1 - visible;
-  return {
-    ...canopy,
-    cy: ((canopy.cy / 100 - cut) / visible) * 100,
-    ry: canopy.ry / visible,
-  };
+/**
+ * 무대의 폭.
+ *
+ * 좁은 화면에서 나무를 화면에 맞춰 줄이면 아래쪽에 납작하게 깔려 휑해 보입니다.
+ * 그래서 나무는 화면 밖으로 넘칠 만큼 키우고 좌우를 잘라냅니다.
+ * 잘려도 되는 건 나무뿐이고, 눌러야 하는 괴물은 canopySqueeze 가 화면 안으로
+ * 모아 줍니다.
+ */
+export const stageWidthCss =
+  `min(calc(100dvh * ${treeShape.aspect}), calc(100vw * ${MAX_STAGE_OVERFLOW}))`;
+
+/**
+ * 나무가 화면 밖으로 넘칠 때, 괴물이 매달리는 가로 범위를 얼마나 좁힐지(0~1).
+ *
+ * 1이면 원래 나뭇잎 폭 그대로, 0.6이면 중앙 쪽으로 60%만큼 모입니다.
+ * 덕분에 나무는 시원하게 잘려 나가면서도 괴물은 항상 화면 안에 남습니다.
+ * 화면에 보이는 나뭇잎 위에 고르게 퍼지므로 어색해 보이지도 않습니다.
+ */
+export const canopySqueeze = (stageWidth: number, viewportWidth: number): number => {
+  if (stageWidth <= 0) return 1;
+  const monsterWidth = Math.max(MONSTER_MIN_PX, stageWidth * MONSTER_SIZE_RATIO);
+  const visibleHalf = (viewportWidth - monsterWidth - STAGE_EDGE_PAD_PX) / 2;
+  const canopyHalf = (canopy.rx / 100) * stageWidth;
+  if (canopyHalf <= 0) return 1;
+  return Math.max(0.15, Math.min(1, visibleHalf / canopyHalf));
 };
 
-/** 무대 기준으로 환산된 나뭇잎 범위. 괴물은 이 타원 안에만 생깁니다. */
-export const canopy = toStageCoords(imageShape);
-
-export const treeShape = { ...imageShape, stageCanopy: canopy };
-
 /**
- * 무대를 화면 안에 'contain' 방식으로 채우는 CSS 폭.
- * 가로가 넓은 화면에서는 높이에, 좁은 화면에서는 너비에 맞춰집니다.
- */
-export const stageWidthCss = `min(100vw, calc(100dvh * ${STAGE_ASPECT}))`;
-
-/**
- * 나뭇잎(타원) 안의 한 점을 고릅니다.
+ * 나뭇잎 안의 한 점을 고릅니다.
+ *
+ * 나뭇잎 범위는 타원으로 잡지만, 그 타원의 '아래쪽 한가운데'는 잎이 아니라
+ * 줄기입니다. 거기에 걸린 괴물은 나뭇가지가 아니라 기둥에 붙은 것처럼 보이므로
+ * 그 구역을 피해 다시 뽑습니다.
+ *
  * sqrt를 쓰는 이유: 그냥 난수를 반지름에 곱하면 가운데로 몰립니다.
  */
+const TRUNK_HALF_WIDTH = 0.45; // 나뭇잎 가로 반지름 대비
+const TRUNK_TOP = 0.5; // 나뭇잎 세로 반지름 대비, 중심에서 아래로
+const MAX_TRIES = 12;
+
 export const randomCanopyPoint = (): { top: number; left: number } => {
   const { cx, cy, rx, ry } = canopy;
-  const angle = Math.random() * Math.PI * 2;
-  const radius = Math.sqrt(Math.random());
-  return {
-    left: cx + rx * radius * Math.cos(angle),
-    top: cy + ry * radius * Math.sin(angle),
-  };
+
+  for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = Math.sqrt(Math.random());
+    const dx = radius * Math.cos(angle);
+    const dy = radius * Math.sin(angle);
+
+    const onTrunk = Math.abs(dx) < TRUNK_HALF_WIDTH && dy > TRUNK_TOP;
+    if (onTrunk && attempt < MAX_TRIES - 1) continue;
+
+    return { left: cx + rx * dx, top: cy + ry * dy };
+  }
+  return { left: cx, top: cy };
 };
