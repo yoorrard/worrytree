@@ -1,12 +1,12 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Worry, ClearedWorry, monsterColors, FALL_DURATION_MS } from './types';
-import { randomCanopyPoint } from './services/treeShape';
+import { Worry, ClearedWorry, FALL_DURATION_MS } from './types';
 import {
-  createWorryId,
+  createWorry,
+  decodeLegacySharedWorries,
   decodeSharedWorries,
   fetchLegacySharedWorries,
   getAppBaseUrl,
-  MAX_WORRY_TEXT_LENGTH,
+  sanitizeWorryText,
   ShareLinkError,
 } from './services/shareLink';
 import WorryTree from './components/WorryTree';
@@ -17,8 +17,6 @@ import ShareModal from './components/ShareModal';
 import Celebration from './components/Celebration';
 import WorrySummary from './components/WorrySummary';
 import ShareLinkErrorNotice from './components/ShareLinkErrorNotice';
-
-const randomBetween = (min: number, max: number) => Math.random() * (max - min) + min;
 
 const App: React.FC = () => {
   const [worries, setWorries] = useState<Worry[]>([]);
@@ -53,20 +51,23 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const dataParam = params.get('data');
+    const shared = params.get('d');
+    const legacyData = params.get('data');
     const worryId = params.get('worryId');
 
     // 공유 링크로 들어온 게 아니면 그냥 내 나무를 시작합니다.
-    if (!dataParam && !worryId) return;
+    if (!shared && !legacyData && !worryId) return;
 
     let cancelled = false;
     setIsLoadingShared(true);
 
     (async () => {
       try {
-        const loaded = dataParam
-          ? decodeSharedWorries(dataParam)
-          : await fetchLegacySharedWorries(worryId as string, params.get('store'));
+        const loaded = shared
+          ? decodeSharedWorries(shared)
+          : legacyData
+            ? decodeLegacySharedWorries(legacyData)
+            : await fetchLegacySharedWorries(worryId as string, params.get('store'));
 
         if (cancelled) return;
         setWorries(loaded);
@@ -99,20 +100,15 @@ const App: React.FC = () => {
     }
   }, [worries.length, clearedWorries.length]);
 
-  const handleAddWorry = useCallback((text: string) => {
-    const spot = randomCanopyPoint();
-    const newWorry: Worry = {
-      id: createWorryId(),
-      text: text.slice(0, MAX_WORRY_TEXT_LENGTH),
-      isFalling: false,
-      position: {
-        top: Math.round(spot.top),
-        left: Math.round(spot.left),
-        rotate: Math.round(randomBetween(-15, 15)),
-      },
-      color: monsterColors[Math.floor(Math.random() * monsterColors.length)],
-    };
-    setWorries(prev => [...prev, newWorry]);
+  const handleAddWorry = useCallback((rawText: string) => {
+    const text = sanitizeWorryText(rawText);
+    if (!text) return;
+    setWorries(prev => {
+      // 자리와 색은 본문에서 계산합니다. 같은 걱정을 또 적으면 겹치지 않도록
+      // 몇 번째인지를 함께 넘깁니다.
+      const duplicateIndex = prev.filter(w => w.text === text).length;
+      return [...prev, createWorry(text, duplicateIndex)];
+    });
   }, []);
 
   const handleMonsterClick = (worry: Worry) => {
