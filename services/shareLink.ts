@@ -1,5 +1,5 @@
 import LZString from 'lz-string';
-import { Worry, monsterColors, CANOPY_BOUNDS } from '../types';
+import { Worry, monsterColors } from '../types';
 
 /**
  * 공유 링크의 인코딩과 디코딩을 한곳에 모아둔 모듈.
@@ -78,8 +78,8 @@ const unpackWorry = (entry: unknown): Worry | null => {
   const num = (value: unknown, fallback: number) =>
     typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 
-  const top = clamp(num(entry[1], CANOPY_BOUNDS.top.min), 0, 100);
-  const left = clamp(num(entry[2], CANOPY_BOUNDS.left.min), 0, 100);
+  const top = clamp(num(entry[1], 40), 0, 100);
+  const left = clamp(num(entry[2], 50), 0, 100);
   const rotate = clamp(num(entry[3], 0), -45, 45);
   const colorIndex = clamp(Math.trunc(num(entry[4], 0)), 0, monsterColors.length - 1);
 

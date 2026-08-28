@@ -1,11 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import {
-  Worry,
-  ClearedWorry,
-  monsterColors,
-  CANOPY_BOUNDS,
-  FALL_DURATION_MS,
-} from './types';
+import { Worry, ClearedWorry, monsterColors, FALL_DURATION_MS } from './types';
+import { randomCanopyPoint } from './services/treeShape';
 import {
   createWorryId,
   decodeSharedWorries,
@@ -105,13 +100,14 @@ const App: React.FC = () => {
   }, [worries.length, clearedWorries.length]);
 
   const handleAddWorry = useCallback((text: string) => {
+    const spot = randomCanopyPoint();
     const newWorry: Worry = {
       id: createWorryId(),
       text: text.slice(0, MAX_WORRY_TEXT_LENGTH),
       isFalling: false,
       position: {
-        top: `${Math.round(randomBetween(CANOPY_BOUNDS.top.min, CANOPY_BOUNDS.top.max))}%`,
-        left: `${Math.round(randomBetween(CANOPY_BOUNDS.left.min, CANOPY_BOUNDS.left.max))}%`,
+        top: `${Math.round(spot.top)}%`,
+        left: `${Math.round(spot.left)}%`,
         transform: `rotate(${Math.round(randomBetween(-15, 15))}deg)`,
       },
       color: monsterColors[Math.floor(Math.random() * monsterColors.length)],
