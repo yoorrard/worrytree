@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 전역 스타일 및 애니메이션.
+   index.html 인라인 <style>에서 옮겨왔습니다 — Vite가 번들·최소화하고
+   해시된 파일명으로 내보내므로 캐시 효율이 좋습니다. */
+
+body {
+  font-family: 'Jua', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+}
+
+/* 걱정 괴물이 나뭇가지에 매달려 흔들리는 모션 */
+@keyframes hang {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+.animate-hang {
+  animation: hang 4s ease-in-out infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* 모든 걱정을 해결했을 때 떨어지는 색종이 */
+.confetti {
+  position: absolute;
+  width: 10px;
+  height: 20px;
+  top: -20px;
+  opacity: 0;
+  animation: fall 5s linear infinite;
+}
+@keyframes fall {
+  0% {
+    transform: translateY(0vh) rotateZ(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(105vh) rotateZ(720deg);
+    opacity: 0;
+  }
+}
+
+/* 모션을 줄이도록 설정한 사용자를 위한 배려 */
+@media (prefers-reduced-motion: reduce) {
+  .animate-hang,
+  .confetti {
+    animation: none;
+  }
+  .confetti { display: none; }
+}

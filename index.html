@@ -1,59 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Worry Tree</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>걱정 나무</title>
+  <meta name="description" content="걱정을 나무에 매달고, 따뜻한 위로를 보내 떠나보내는 공간이에요." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="걱정 나무" />
+  <meta property="og:description" content="친구가 남긴 걱정을 위로해주세요." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Jua', sans-serif;
-    }
-    @keyframes hang {
-      0%, 100% { transform: rotate(-2deg); }
-      50% { transform: rotate(2deg); }
-    }
-    .animate-hang {
-      animation: hang 4s ease-in-out infinite;
-    }
-     @keyframes fadeIn {
-      from { opacity: 0; transform: scale(0.5); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    .animate-fadeIn {
-      animation: fadeIn 0.5s ease-out forwards;
-    }
-    .confetti {
-      position: absolute;
-      width: 10px;
-      height: 20px;
-      top: -20px;
-      opacity: 0;
-      animation: fall 5s linear infinite;
-    }
-    @keyframes fall {
-      0% {
-        transform: translateY(0vh) rotateZ(0deg);
-        opacity: 1;
-      }
-      100% {
-        transform: translateY(105vh) rotateZ(720deg);
-        opacity: 0;
-      }
-    }
-  </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="importmap">
 {
   "imports": {
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
     "react": "https://aistudiocdn.com/react@^19.1.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.20.0",
     "qrcode": "https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm",
     "lz-string": "https://cdn.jsdelivr.net/npm/lz-string@1.5.0/+esm"
   }

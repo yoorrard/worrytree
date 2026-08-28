@@ -1,5 +1,5 @@
 import React from 'react';
-import { Worry } from '../types';
+import { Worry, FALL_DURATION_MS } from '../types';
 import { MonsterIcon } from './icons';
 
 interface WorryMonsterProps {
@@ -8,35 +8,72 @@ interface WorryMonsterProps {
   onClick: (worry: Worry) => void;
 }
 
+/**
+ * 레이어를 3겹으로 나눈 이유:
+ *  - 바깥: 무대 위 위치. transform은 가운데 정렬 전용으로만 씁니다.
+ *  - 가운데: 매달려 흔들리는 CSS 애니메이션(animate-hang).
+ *  - 안쪽: 걱정마다 다른 고유 기울기와 떨어질 때의 회전.
+ *
+ * 예전에는 셋을 한 요소에 몰아넣어서, CSS 애니메이션이 인라인 transform보다
+ * 우선순위가 높은 탓에 걱정마다 저장해둔 기울기가 화면에 전혀 반영되지 않았습니다.
+ */
 const WorryMonster: React.FC<WorryMonsterProps> = ({ worry, isComfortingMode, onClick }) => {
-  const monsterStyle: React.CSSProperties = {
-    top: worry.isFalling ? '110%' : worry.position.top,
+  const isClickable = isComfortingMode && !worry.isFalling;
+
+  const positionStyle: React.CSSProperties = {
+    top: worry.isFalling ? '118%' : worry.position.top,
     left: worry.position.left,
-    transform: worry.isFalling ? `translateY(200px) rotate(180deg) scale(0.5)` : worry.position.transform,
-    transition: 'top 2s ease-in, opacity 2s ease-in, transform 2s ease-in-out',
+    // 좌표가 괴물의 '중심'을 가리키도록 맞춥니다. 무대 가장자리(12%, 86%)에
+    // 매달린 괴물이 잘리지 않습니다.
+    transform: 'translate(-50%, -50%)',
     opacity: worry.isFalling ? 0 : 1,
+    transition: `top ${FALL_DURATION_MS}ms ease-in, opacity ${FALL_DURATION_MS}ms ease-in`,
+  };
+
+  const tiltStyle: React.CSSProperties = {
+    transform: worry.isFalling
+      ? `${worry.position.transform} rotate(180deg) scale(0.5)`
+      : worry.position.transform,
+    transition: `transform ${FALL_DURATION_MS}ms ease-in-out`,
   };
 
   const handleClick = () => {
-    onClick(worry);
+    if (isClickable) onClick(worry);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isClickable) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick(worry);
+    }
   };
 
   return (
-    <div
-      className={`absolute z-20 w-16 h-16 md:w-20 md:h-20 flex flex-col items-center group animate-fadeIn ${worry.isFalling ? '' : 'animate-hang'}`}
-      style={monsterStyle}
-      onClick={handleClick}
-    >
-      <div 
-        className={`relative w-full h-full transition-transform duration-300 ease-in-out ${isComfortingMode && !worry.isFalling ? 'cursor-pointer group-hover:scale-110' : ''}`}
-      >
-        <MonsterIcon color={worry.color} />
-        {isComfortingMode && !worry.isFalling && (
-            <div className="absolute inset-0 bg-white rounded-full opacity-0 group-hover:opacity-20 transition-opacity duration-300" style={{filter: 'blur(10px)'}}></div>
-        )}
-      </div>
-      <div className="absolute -bottom-6 w-max max-w-[150px] p-2 bg-white bg-opacity-90 text-slate-700 text-xs rounded-lg shadow-md border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none truncate">
-        {worry.text}
+    <div className="absolute z-20 group animate-fadeIn" style={positionStyle}>
+      <div className={worry.isFalling ? '' : 'animate-hang'}>
+        <div
+          style={tiltStyle}
+          className={`relative w-16 h-16 md:w-20 md:h-20 flex flex-col items-center rounded-full transition-transform duration-300 ease-in-out focus:outline-none focus-visible:ring-4 focus-visible:ring-green-500 ${
+            isClickable ? 'cursor-pointer group-hover:scale-110' : ''
+          }`}
+          onClick={handleClick}
+          onKeyDown={handleKeyDown}
+          role={isClickable ? 'button' : undefined}
+          tabIndex={isClickable ? 0 : undefined}
+          aria-label={isClickable ? `걱정 "${worry.text}" 위로하기` : undefined}
+        >
+          <MonsterIcon color={worry.color} />
+          {isClickable && (
+            <div
+              className="absolute inset-0 bg-white rounded-full opacity-0 group-hover:opacity-20 transition-opacity duration-300"
+              style={{ filter: 'blur(10px)' }}
+            />
+          )}
+          <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 w-max max-w-[150px] p-2 bg-white bg-opacity-90 text-slate-700 text-xs rounded-lg shadow-md border border-gray-200 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none truncate">
+            {worry.text}
+          </div>
+        </div>
       </div>
     </div>
   );

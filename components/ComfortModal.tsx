@@ -4,7 +4,7 @@ import { Worry } from '../types';
 interface ComfortModalProps {
   worry: Worry;
   onClose: () => void;
-  onConfirm: (worryId: number, comfortText: string) => void;
+  onConfirm: (worryId: string, comfortText: string) => void;
 }
 
 const ComfortModal: React.FC<ComfortModalProps> = ({ worry, onClose, onConfirm }) => {

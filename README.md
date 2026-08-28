@@ -1,20 +1,124 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 걱정 나무 (Worry Tree)
 
-# Run and deploy your AI Studio app
+걱정을 나무에 괴물로 매달아 두고, 따뜻한 위로의 말을 적어 떠나보내는 웹 앱입니다.
+만든 나무는 링크나 QR 코드로 친구에게 보내 대신 위로해 달라고 부탁할 수 있습니다.
 
-This contains everything you need to run your app locally.
+**서버가 없습니다.** 걱정은 어디에도 저장되지 않고, 공유 링크 자체에 압축되어 담깁니다.
+그래서 정적 호스팅(무료)만으로 운영할 수 있고 운영비가 들지 않습니다.
 
-View your app in AI Studio: https://ai.studio/apps/ab251aea-7656-47ac-ba8c-a46cd22f3be8
+## 실행하기
 
-## Run Locally
+```bash
+npm install
+npm run dev        # http://localhost:3000
+```
 
-**Prerequisites:**  Node.js
+| 명령 | 하는 일 |
+| --- | --- |
+| `npm run dev` | 개발 서버 |
+| `npm run build` | `dist/` 에 배포용 파일 생성 |
+| `npm run preview` | 빌드 결과 미리보기 |
+| `npm run typecheck` | 타입 검사 |
+| `npm run tree -- <이미지>` | 나무 이미지 최적화 후 적용 |
 
+## 나무 이미지 교체하기
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+기본값은 코드에 들어 있는 SVG 나무라 외부 요청이 전혀 없습니다.
+직접 만든 그림으로 바꾸려면 한 줄이면 됩니다.
+
+```bash
+npm run tree -- ~/Downloads/내가만든나무.png
+```
+
+`assets/tree.webp` 로 최적화되어 저장되고, 앱이 자동으로 그 파일을 씁니다.
+**코드는 고칠 필요가 없습니다.** 되돌리려면 `assets/tree.webp` 를 지우면 기본 SVG로 돌아갑니다.
+
+### 그림 만들 때 권장 규격
+
+| 항목 | 권장값 |
+| --- | --- |
+| 크기 | **1200 × 1600 px** (가로:세로 = 3:4) |
+| 형식 | 배경이 **투명한 PNG** (하늘색 배경 위에 얹힙니다) |
+| 최소 크기 | 900 × 1200 px |
+
+더 크게 만들어도 괜찮습니다. 스크립트가 1200×1600으로 줄이고 WebP로 바꿔
+보통 원본의 10~30% 크기로 만들어 줍니다. 반대로 이보다 작으면 억지로 늘리지 않습니다
+(흐려지기만 하므로).
+
+### 구도가 중요합니다
+
+걱정 괴물은 그림 기준으로 **세로 14~56%, 가로 12~86%** 범위에 매달립니다.
+이 영역을 나뭇잎이 덮고 있어야 괴물이 허공에 뜨지 않습니다.
+
+```
+ 0%  ┌─────────────────┐
+     │      하늘        │
+14%  │   ┌─────────┐   │  ← 괴물이 매달리기 시작
+     │   │ 나뭇잎이  │   │
+     │   │ 이 영역을 │   │
+     │   │ 덮어야 함 │   │
+56%  │   └─────────┘   │  ← 괴물이 매달리는 끝
+     │      줄기        │
+100% └─────────────────┘  ← 바닥에 닿게
+       12%         86%
+```
+
+- 나뭇잎은 넉넉하게, 위 영역보다 조금 더 넓게 그려주세요.
+- 줄기는 아래쪽 가운데, 그림 맨 아래에 닿도록 그려주세요.
+- 그림 가장자리에 투명한 여백이 많으면 `--trim` 옵션으로 잘라낼 수 있습니다.
+
+```bash
+npm run tree -- ./tree.png --trim              # 투명 여백 제거
+npm run tree -- ./tree.png --quality 90        # 화질 조절 (기본 82)
+```
+
+비율을 다르게 쓰고 싶다면 `types.ts` 의 `TREE_ASPECT_W` / `TREE_ASPECT_H` 와
+`CANOPY_BOUNDS` 를 함께 조정하면 됩니다.
+
+## 배포하기
+
+빌드 결과물은 **경로에 의존하지 않습니다**(`base: './'`). 하위 경로에 올려도
+그대로 동작하므로 별도 설정이 필요 없습니다.
+
+```bash
+npm run build     # dist/ 를 통째로 올리면 끝
+```
+
+- **GitHub Pages** — `dist/` 를 `gh-pages` 브랜치에 올리거나 Actions로 배포
+- **Cloudflare Pages / Netlify / Vercel** — 빌드 명령 `npm run build`, 출력 폴더 `dist`
+
+셋 다 개인 프로젝트 규모에서는 무료입니다. 서버도, 데이터베이스도, API 키도 필요 없습니다.
+
+## 공유 링크에 대해
+
+걱정 내용은 압축되어 **링크 주소 안에** 들어갑니다. 서버에 저장되지 않는 대신,
+**링크를 가진 사람은 누구나 내용을 볼 수 있습니다.** 링크는 브라우저 방문 기록이나
+메신저 미리보기에도 남을 수 있으니 믿을 수 있는 사람에게만 보내주세요.
+(앱 안에도 같은 안내가 표시됩니다.)
+
+걱정이 많아지면 링크가 길어지고 QR 코드가 촘촘해집니다. 앱이 자동으로
+오류정정 수준을 조절하고, 스캔이 어려울 정도가 되면 링크 복사를 안내합니다.
+
+## 구조
+
+```
+index.html            뼈대 (폰트 링크 외 외부 의존성 없음)
+index.css             전역 스타일 + Tailwind
+index.tsx             진입점
+App.tsx               상태와 화면 조립
+types.ts              공유 타입과 상수 (무대 비율, 괴물 색 등)
+services/
+  shareLink.ts        공유 링크 인코딩·디코딩 (한곳에 모아 포맷이 어긋나지 않게)
+components/
+  WorryTree.tsx       나무 + 괴물이 공유하는 '무대'
+  TreeIllustration.tsx  기본 SVG 나무
+  WorryMonster.tsx    걱정 괴물 하나
+  WorryInput.tsx      걱정 입력
+  ComfortModal.tsx    위로 작성
+  ShareModal.tsx      링크 · QR 생성
+  WorrySummary.tsx    위로 기록 + PDF 저장
+  Celebration.tsx     색종이
+  ShareLinkErrorNotice.tsx  링크를 못 읽었을 때 안내
+scripts/
+  optimize-tree.mjs   나무 이미지 최적화
+```
