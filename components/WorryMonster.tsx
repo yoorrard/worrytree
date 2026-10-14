@@ -60,12 +60,15 @@ const WorryMonster: React.FC<WorryMonsterProps> = ({ worry, isComfortingMode, on
     }
   };
 
+  // 클릭은 둥근 몸통만 받습니다. 바깥 두 겹은 네모난 상자라서, 괴물끼리 겹치면
+  // 앞쪽 괴물의 투명한 모서리가 뒤쪽 괴물의 클릭을 가로채 위로할 수 없는 걱정이
+  // 생겼습니다. 바깥 겹은 클릭을 통과시키고, 둥근 몸통(rounded-full)만 받게 합니다.
   return (
-    <div className="absolute z-20 group animate-fadeIn" style={positionStyle}>
+    <div className="absolute z-20 group animate-fadeIn pointer-events-none" style={positionStyle}>
       <div className={`w-full h-full ${worry.isFalling ? '' : 'animate-hang'}`}>
         <div
           style={tiltStyle}
-          className={`relative w-full h-full rounded-full transition-transform duration-300 ease-in-out focus:outline-none focus-visible:ring-4 focus-visible:ring-green-600 ${
+          className={`relative w-full h-full rounded-full pointer-events-auto transition-transform duration-300 ease-in-out focus:outline-none focus-visible:ring-4 focus-visible:ring-green-600 ${
             isClickable ? 'cursor-pointer group-hover:scale-110' : ''
           }`}
           onClick={handleClick}
@@ -74,10 +77,13 @@ const WorryMonster: React.FC<WorryMonsterProps> = ({ worry, isComfortingMode, on
           tabIndex={isClickable ? 0 : undefined}
           aria-label={isClickable ? `걱정 "${worry.text}" 위로하기` : undefined}
         >
-          <MonsterIcon color={worry.color} />
+          {/* 그림은 네모난 SVG라 모서리가 클릭을 가로채지 않도록 통과시킵니다. */}
+          <div className="w-full h-full pointer-events-none">
+            <MonsterIcon color={worry.color} />
+          </div>
           {isClickable && (
             <div
-              className="absolute inset-0 bg-white rounded-full opacity-0 group-hover:opacity-25 transition-opacity duration-300"
+              className="absolute inset-0 bg-white rounded-full opacity-0 group-hover:opacity-25 transition-opacity duration-300 pointer-events-none"
               style={{ filter: 'blur(10px)' }}
             />
           )}

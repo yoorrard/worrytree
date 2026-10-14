@@ -12,7 +12,15 @@ export interface Worry {
 export interface ClearedWorry {
   worryText: string;
   comfortText: string;
+  /** 위로 기록 이미지에 같은 색의 괴물을 그려 넣기 위해 보관합니다. */
+  color?: string;
 }
+
+/**
+ * 위로 글의 최대 길이.
+ * 위로 기록 이미지의 카드가 끝없이 길어지지 않도록 입력 단계에서 막습니다.
+ */
+export const MAX_COMFORT_TEXT_LENGTH = 200;
 
 /**
  * 나무 그림과 걱정 괴물이 공유하는 '무대'의 모양.

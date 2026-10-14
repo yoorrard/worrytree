@@ -121,7 +121,10 @@ const App: React.FC = () => {
     const worryToClear = worries.find(w => w.id === worryId);
     if (!worryToClear) return;
 
-    setClearedWorries(prev => [...prev, { worryText: worryToClear.text, comfortText }]);
+    setClearedWorries(prev => [
+      ...prev,
+      { worryText: worryToClear.text, comfortText, color: worryToClear.color },
+    ]);
     setWorries(prev => prev.map(w => (w.id === worryId ? { ...w, isFalling: true } : w)));
     setSelectedWorry(null);
 

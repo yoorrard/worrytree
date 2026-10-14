@@ -11,8 +11,6 @@
     "tree": "node scripts/optimize-tree.mjs"
   },
   "dependencies": {
-    "html2canvas": "^1.4.1",
-    "jspdf": "^2.5.2",
     "lz-string": "1.5.0",
     "qrcode": "1.5.3",
     "react": "^19.1.1",

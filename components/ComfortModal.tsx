@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Worry } from '../types';
+import { Worry, MAX_COMFORT_TEXT_LENGTH } from '../types';
 
 interface ComfortModalProps {
   worry: Worry;
@@ -29,8 +29,13 @@ const ComfortModal: React.FC<ComfortModalProps> = ({ worry, onClose, onConfirm }
             placeholder="따뜻한 위로의 말을 직접 적어주세요."
             className="w-full h-full bg-transparent text-slate-700 text-center text-lg resize-none focus:outline-none placeholder-gray-500"
             rows={4}
+            maxLength={MAX_COMFORT_TEXT_LENGTH}
+            aria-describedby="comfort-length"
           />
         </div>
+        <p id="comfort-length" className="mt-2 text-right text-xs text-slate-400">
+          {comfortingMessage.length} / {MAX_COMFORT_TEXT_LENGTH}
+        </p>
 
         <div className="flex gap-4 mt-8">
           <button
