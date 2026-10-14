@@ -10,6 +10,16 @@ body {
   font-family: 'Jua', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 }
 
+/* 넘치는 내용을 잘라내되, 그 상자가 옆으로 '스크롤'되지는 않게 합니다.
+   overflow: hidden 상자는 사용자가 못 움직여도 브라우저는 움직일 수 있어서,
+   예를 들어 화면 밖에 걸친 버튼을 누르면 그 버튼을 보여주려고 나무와 괴물을
+   통째로 옆으로 밀어버립니다. overflow: clip 은 스크롤 자체가 없어 밀리지 않습니다.
+   clip 을 모르는 옛 브라우저는 앞 줄의 hidden 으로 동작합니다. */
+.overflow-clip-safe {
+  overflow: hidden;
+  overflow: clip;
+}
+
 /* 걱정 괴물이 나뭇가지에 매달려 흔들리는 모션 */
 @keyframes hang {
   0%, 100% { transform: rotate(-2deg); }

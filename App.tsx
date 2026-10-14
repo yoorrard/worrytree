@@ -152,7 +152,7 @@ const App: React.FC = () => {
         : '당신의 걱정을 나무에 매달아보세요.';
 
   return (
-    <main className="relative w-screen h-[100dvh] overflow-hidden bg-sky-100 text-slate-800 flex items-center justify-center">
+    <main className="relative w-screen h-[100dvh] overflow-clip-safe bg-sky-100 text-slate-800 flex items-center justify-center">
       {allWorriesCleared && (
         <>
           <Celebration />

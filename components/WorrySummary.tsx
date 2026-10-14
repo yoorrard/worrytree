@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ClearedWorry } from '../types';
-import { renderComfortImages, saveImages } from '../services/comfortImage';
+import { ComfortPdf, createComfortPdf, downloadFile, shareFile } from '../services/comfortPdf';
 import { customTreeSrc } from '../services/treeShape';
 
 interface WorrySummaryProps {
@@ -10,9 +10,9 @@ interface WorrySummaryProps {
   onStartOwnTree: () => void;
 }
 
-type ImageState =
+type PdfState =
   | { status: 'preparing' }
-  | { status: 'ready'; files: File[] }
+  | { status: 'ready'; pdf: ComfortPdf }
   | { status: 'error' };
 
 type Notice = { tone: 'info' | 'error'; text: string } | null;
@@ -23,23 +23,23 @@ const WorrySummary: React.FC<WorrySummaryProps> = ({
   onClose,
   onStartOwnTree,
 }) => {
-  const [image, setImage] = useState<ImageState>({ status: 'preparing' });
+  const [pdf, setPdf] = useState<PdfState>({ status: 'preparing' });
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
 
-  // 이미지는 화면이 열리자마자 미리 만들어 둡니다.
-  // 휴대폰의 공유 시트는 버튼을 누른 직후에만 열 수 있어서, 누른 뒤에 이미지를
-  // 그리느라 시간을 쓰면 브라우저가 공유를 막아버립니다.
+  // PDF는 화면이 열리자마자 미리 만들어 둡니다.
+  // 휴대폰의 공유 시트는 버튼을 누른 직후에만 열 수 있어서, 누른 뒤에 PDF를
+  // 만드느라 시간을 쓰면 브라우저가 공유를 막아버립니다.
   const prepare = useCallback(() => {
     let cancelled = false;
-    setImage({ status: 'preparing' });
-    renderComfortImages({ items: clearedWorries, isSharedView, treeSrc: customTreeSrc })
-      .then(files => {
-        if (!cancelled) setImage({ status: 'ready', files });
+    setPdf({ status: 'preparing' });
+    createComfortPdf({ items: clearedWorries, isSharedView, treeSrc: customTreeSrc })
+      .then(result => {
+        if (!cancelled) setPdf({ status: 'ready', pdf: result });
       })
       .catch(error => {
-        console.error('위로 기록 이미지를 만들지 못했습니다:', error);
-        if (!cancelled) setImage({ status: 'error' });
+        console.error('위로 기록 PDF를 만들지 못했습니다:', error);
+        if (!cancelled) setPdf({ status: 'error' });
       });
     return () => {
       cancelled = true;
@@ -49,42 +49,41 @@ const WorrySummary: React.FC<WorrySummaryProps> = ({
   useEffect(prepare, [prepare]);
 
   const handleSave = async () => {
-    if (image.status === 'error') {
+    if (pdf.status === 'error') {
       setNotice(null);
       prepare();
       return;
     }
-    if (image.status !== 'ready') return;
+    if (pdf.status !== 'ready') return;
 
-    setIsSaving(true);
+    const { file, pageCount } = pdf.pdf;
     setNotice(null);
+    setIsSaving(true);
+    const shared = await shareFile(file);
+    setIsSaving(false);
+    if (shared === 'shared' || shared === 'cancelled') return;
+
     try {
-      const result = await saveImages(image.files);
-      if (result === 'downloaded') {
-        setNotice({
-          tone: 'info',
-          text:
-            image.files.length > 1
-              ? `이미지 ${image.files.length}장을 저장했어요. 다운로드 폴더를 확인해보세요.`
-              : '이미지를 저장했어요. 다운로드 폴더를 확인해보세요.',
-        });
-      }
+      downloadFile(file);
     } catch (error) {
-      console.error('위로 기록 이미지를 저장하지 못했습니다:', error);
-      setNotice({ tone: 'error', text: '이미지를 저장하지 못했어요. 잠시 후 다시 시도해주세요.' });
-    } finally {
-      setIsSaving(false);
+      console.error('위로 기록 PDF를 저장하지 못했습니다:', error);
+      setNotice({ tone: 'error', text: 'PDF를 저장하지 못했어요. 잠시 후 다시 시도해주세요.' });
+      return;
     }
+    setNotice({
+      tone: 'info',
+      text: `PDF${pageCount > 1 ? `(${pageCount}쪽)` : ''}를 저장했어요. 다운로드 폴더를 확인해보세요.`,
+    });
   };
 
   const saveLabel =
-    image.status === 'preparing'
-      ? '이미지 준비 중...'
-      : image.status === 'error'
-        ? '이미지 다시 만들기'
+    pdf.status === 'preparing'
+      ? 'PDF 준비 중...'
+      : pdf.status === 'error'
+        ? 'PDF 다시 만들기'
         : isSaving
           ? '저장하는 중...'
-          : '이미지로 저장하기';
+          : 'PDF로 저장하기';
 
   return (
     <div
@@ -118,9 +117,9 @@ const WorrySummary: React.FC<WorrySummaryProps> = ({
           ))}
         </div>
 
-        {image.status === 'error' && !notice && (
+        {pdf.status === 'error' && !notice && (
           <p className="mt-4 text-sm text-rose-600 bg-rose-50 rounded-xl py-2 px-3">
-            이미지를 만들지 못했어요. 아래 버튼으로 다시 시도해주세요.
+            PDF를 만들지 못했어요. 아래 버튼으로 다시 시도해주세요.
           </p>
         )}
         {notice && (
@@ -144,7 +143,7 @@ const WorrySummary: React.FC<WorrySummaryProps> = ({
           </button>
           <button
             onClick={handleSave}
-            disabled={image.status === 'preparing' || isSaving}
+            disabled={pdf.status === 'preparing' || isSaving}
             className="px-8 py-3 rounded-full text-lg font-semibold transition-all duration-300 ease-in-out transform hover:scale-105 shadow-lg focus:outline-none focus:ring-4 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white focus:ring-indigo-300"
           >
             {saveLabel}

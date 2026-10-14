@@ -45,7 +45,7 @@ const WorryTree: React.FC<WorryTreeProps> = ({ children }) => {
   }, [measure]);
 
   return (
-    <div className="absolute inset-0 flex items-end justify-center overflow-hidden">
+    <div className="absolute inset-0 flex items-end justify-center overflow-clip-safe">
       <div
         ref={stageRef}
         className="relative flex-shrink-0"

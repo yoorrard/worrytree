@@ -1,33 +1,44 @@
 import { ClearedWorry, monsterColors } from '../types';
+import { A4_POINTS, buildPdf, PdfPage } from './pdfWriter';
 
 /**
- * 위로 기록을 PNG 이미지로 그립니다.
+ * 위로 기록을 A4 PDF로 만듭니다.
  *
- * 예전에는 화면의 목록을 html2canvas로 찍어 jsPDF로 PDF를 만들었습니다.
- * 라이브러리 세 개(약 580KB)를 내려받아야 했고, 결과물은 화면을 그대로 찍은
- * 모양이라 스크롤 상자·버튼 같은 화면 요소의 흔적이 남았습니다.
- * 휴대폰에서는 PDF를 열고 보관하기도 번거로웠습니다.
+ * 예전에는 화면의 목록을 html2canvas로 한 장 길게 찍은 뒤, A4 높이마다
+ * 기계적으로 잘라 jsPDF로 붙였습니다. 그래서
+ *   - 카드와 글줄이 쪽 경계에서 반으로 잘렸고
+ *   - 종이 가장자리까지 여백 없이 꽉 찼고
+ *   - 제목·날짜 없이 목록만 들어갔고
+ *   - 해상도가 낮아(약 145DPI) 인쇄하면 글자가 흐렸고
+ *   - 라이브러리 약 740KB를 내려받아야 했습니다.
  *
- * 이제는 브라우저에 기본으로 들어 있는 Canvas로 저장용 이미지를 직접 그립니다.
- * 추가 라이브러리가 없고, 학생이 사진첩에 넣어두거나 메신저로 보내기 좋은
- * 모양으로 나옵니다.
+ * 이제는 브라우저 기본 Canvas로 A4 한 쪽씩 직접 그리고, 카드가 쪽 경계에
+ * 걸리면 통째로 다음 쪽으로 넘깁니다. 그린 쪽들은 pdfWriter 가 PDF 하나로
+ * 묶습니다. 추가 라이브러리가 없습니다.
+ *
+ * 쪽은 그림으로 들어가므로 PDF 안의 글자를 선택·검색할 수는 없습니다.
+ * 한글 글꼴을 PDF에 심으려면 수 MB의 글꼴 파일이나 별도 라이브러리가
+ * 필요해서, 비용 없는 운영 원칙에 맞춰 그림 방식을 택했습니다.
  */
 
-export const IMAGE_WIDTH = 1080;
+/** 쪽을 그리는 논리 좌표계. A4 비율(210:297)에 맞춥니다. */
+const PAGE_W = 1400;
+const PAGE_H = Math.round((PAGE_W * 297) / 210);
 
 /**
- * 한 장의 최대 높이(px).
- * iOS Safari는 캔버스 하나의 넓이가 약 1,670만 픽셀을 넘으면 그리지 못합니다.
- * 1080 × 10000 은 그 절반쯤이라 오래된 기기에서도 안전합니다.
- * 위로가 아주 많으면 여러 장으로 나눕니다.
+ * 실제 캔버스 배율. 1400 × 1.25 = 1750px 이 210mm 에 들어가므로 약 212DPI 입니다.
+ * 254DPI·품질 0.9 와 200DPI로 확대 비교했을 때 글자 선명도 차이가 보이지 않았고,
+ * 용량은 쪽당 약 30% 가볍습니다. iOS 캔버스 한계(약 1,670만 픽셀)의 4분의 1입니다.
  */
-const MAX_PAGE_HEIGHT = 10000;
+const RENDER_SCALE = 1.25;
+const JPEG_QUALITY = 0.85;
 
 const FONT_STACK = "'Jua', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif";
 const font = (px: number) => `${px}px ${FONT_STACK}`;
 
+/** 인쇄할 때 잉크를 아끼도록 쪽 바탕은 흰색으로 두고 색은 포인트에만 씁니다. */
 const COLOR = {
-  background: '#e0f2fe',
+  page: '#ffffff',
   title: '#166534',
   subtitle: '#475569',
   muted: '#64748b',
@@ -35,45 +46,61 @@ const COLOR = {
   worry: '#1e293b',
   comfortLabel: '#16a34a',
   comfort: '#166534',
-  card: '#ffffff',
+  card: '#fbfefc',
   cardBorder: '#bbf7d0',
   divider: '#cbd5e1',
-  shadow: 'rgba(15, 23, 42, 0.08)',
+  rule: '#dcfce7',
 };
 
-const OUTER_X = 64;
-const CARD_WIDTH = IMAGE_WIDTH - OUTER_X * 2;
-const CARD_PADDING = 44;
-const CARD_GAP = 32;
-const CARD_RADIUS = 36;
-const ICON_SIZE = 76;
-const ICON_GAP = 28;
+const MARGIN_X = 96;
+const MARGIN_TOP = 88;
+const CARD_WIDTH = PAGE_W - MARGIN_X * 2;
+const CARD_PADDING = 36;
+const CARD_GAP = 24;
+const CARD_RADIUS = 32;
+const ICON_SIZE = 72;
+const ICON_GAP = 24;
 const WORRY_TEXT_OFFSET = CARD_PADDING + ICON_SIZE + ICON_GAP;
 const WORRY_TEXT_WIDTH = CARD_WIDTH - WORRY_TEXT_OFFSET - CARD_PADDING;
 const COMFORT_TEXT_WIDTH = CARD_WIDTH - CARD_PADDING * 2;
-const DIVIDER_SPACE = 26;
+const DIVIDER_SPACE = 18;
 
+/** A4에 인쇄했을 때 본문이 16~17pt 정도가 되는 크기입니다. */
 const TYPE = {
-  label: { size: 26, lineHeight: 38 },
-  worry: { size: 38, lineHeight: 54 },
-  comfort: { size: 36, lineHeight: 52 },
-  title: { size: 68, lineHeight: 88 },
+  label: { size: 26, lineHeight: 34 },
+  worry: { size: 40, lineHeight: 56 },
+  comfort: { size: 38, lineHeight: 54 },
+  title: { size: 72, lineHeight: 92 },
   subtitle: { size: 34, lineHeight: 48 },
   date: { size: 28, lineHeight: 40 },
   continued: { size: 40, lineHeight: 56 },
-  footer: { size: 26, lineHeight: 38 },
+  footer: { size: 24, lineHeight: 36 },
 };
 
-/** 긴 글이 카드 하나를 끝없이 늘리지 않도록 줄 수를 제한합니다. */
+/**
+ * 긴 글이 카드 하나를 끝없이 늘리지 않도록 줄 수를 제한합니다.
+ * 이 제한 덕분에 가장 큰 카드도 첫 쪽(머리글 아래)에 반드시 들어갑니다.
+ */
 const MAX_WORRY_LINES = 6;
 const MAX_COMFORT_LINES = 10;
 
-/** 바닥글 높이. 여러 장일 때만 쪽 번호 줄이 붙습니다. */
-const footerHeight = (pageCount: number) => 24 + TYPE.footer.lineHeight * (pageCount > 1 ? 2 : 1) + 56;
-// 쪽 나누기를 정할 때는 쪽 번호가 붙는다고 보고 넉넉하게 잡습니다.
-const FOOTER_HEIGHT = footerHeight(2);
+const FOOTER_HEIGHT = 24 + TYPE.footer.lineHeight + 72;
+const TREE_MAX_WIDTH = 440;
+const TREE_MAX_HEIGHT = 240;
 
 type Ctx = CanvasRenderingContext2D;
+
+/**
+ * 눈에 보이는 글자 하나씩 나눕니다.
+ * Array.from 은 코드 단위로 자르기 때문에 👍🏻 이나 👨‍👩‍👧 같은 이모지가 반으로
+ * 쪼개져 깨진 기호로 그려집니다. 지원하는 브라우저에서는 Intl.Segmenter 를 씁니다.
+ */
+const segmenter =
+  typeof Intl !== 'undefined' && 'Segmenter' in Intl
+    ? new Intl.Segmenter('ko', { granularity: 'grapheme' })
+    : null;
+const graphemes = (text: string): string[] =>
+  segmenter ? Array.from(segmenter.segment(text), part => part.segment) : Array.from(text);
 
 /**
  * 글자를 주어진 폭에 맞춰 여러 줄로 나눕니다.
@@ -104,7 +131,7 @@ const wrapText = (ctx: Ctx, text: string, maxWidth: number, maxLines: number): s
         line = word;
         continue;
       }
-      for (const ch of Array.from(word)) {
+      for (const ch of graphemes(word)) {
         if (line && !fits(line + ch)) {
           lines.push(line);
           line = ch;
@@ -120,7 +147,7 @@ const wrapText = (ctx: Ctx, text: string, maxWidth: number, maxLines: number): s
 
   const kept = lines.slice(0, maxLines);
   let last = kept[maxLines - 1];
-  while (last && !fits(`${last}…`)) last = Array.from(last).slice(0, -1).join('');
+  while (last && !fits(`${last}…`)) last = graphemes(last).slice(0, -1).join('');
   kept[maxLines - 1] = `${last}…`;
   return kept;
 };
@@ -142,28 +169,26 @@ const drawLine = (ctx: Ctx, text: string, x: number, y: number, size: number, li
 };
 
 /** 앱 속 걱정 괴물(components/icons.tsx)과 같은 모양을 캔버스에 그립니다. */
-const MONSTER_BODY = new Path2D(
-  'M 50,10 C 20,10 10,40 10,60 C 10,90 30,100 50,90 C 70,100 90,90 90,60 C 90,40 80,10 50,10 Z',
-);
-const MONSTER_SMILE = new Path2D('M 45,65 Q 50,75 55,65');
+const MONSTER_BODY = 'M 50,10 C 20,10 10,40 10,60 C 10,90 30,100 50,90 C 70,100 90,90 90,60 C 90,40 80,10 50,10 Z';
+const MONSTER_SMILE = 'M 45,65 Q 50,75 55,65';
 
 const drawMonster = (ctx: Ctx, x: number, y: number, size: number, color: string) => {
+  const body = new Path2D(MONSTER_BODY);
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(size / 100, size / 100);
 
   ctx.fillStyle = color;
-  ctx.fill(MONSTER_BODY);
-  // 앱에서는 초록 나뭇잎 위라 밝게 빛나도 괜찮지만, 흰 카드 위에서는
-  // 하이라이트가 강하면 흰 눈이 몸통에 묻힙니다. 윗부분만 살짝 밝힙니다.
+  ctx.fill(body);
+  // 흰 종이 위에서는 하이라이트가 강하면 흰 눈이 몸통에 묻힙니다. 윗부분만 살짝 밝힙니다.
   const shine = ctx.createRadialGradient(40, 28, 2, 40, 28, 30);
   shine.addColorStop(0, 'rgba(255,255,255,0.45)');
   shine.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = shine;
-  ctx.fill(MONSTER_BODY);
+  ctx.fill(body);
   ctx.strokeStyle = 'rgba(15,23,42,0.12)';
   ctx.lineWidth = 2;
-  ctx.stroke(MONSTER_BODY);
+  ctx.stroke(body);
 
   ctx.fillStyle = '#ffffff';
   for (const [cx, cy] of [[38, 45], [62, 45]]) {
@@ -180,7 +205,7 @@ const drawMonster = (ctx: Ctx, x: number, y: number, size: number, color: string
   ctx.strokeStyle = '#1f2937';
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
-  ctx.stroke(MONSTER_SMILE);
+  ctx.stroke(new Path2D(MONSTER_SMILE));
   ctx.restore();
 };
 
@@ -217,20 +242,14 @@ const measureCard = (ctx: Ctx, item: ClearedWorry, index: number): CardLayout =>
 };
 
 const drawCard = (ctx: Ctx, card: CardLayout, y: number) => {
-  const x = OUTER_X;
+  const x = MARGIN_X;
 
-  ctx.save();
-  ctx.shadowColor = COLOR.shadow;
-  ctx.shadowBlur = 24;
-  ctx.shadowOffsetY = 8;
+  // 인쇄물에서는 그림자보다 또렷한 테두리가 깔끔합니다.
   ctx.fillStyle = COLOR.card;
   roundedRectPath(ctx, x, y, CARD_WIDTH, card.height, CARD_RADIUS);
   ctx.fill();
-  ctx.restore();
-
   ctx.strokeStyle = COLOR.cardBorder;
-  ctx.lineWidth = 2;
-  roundedRectPath(ctx, x, y, CARD_WIDTH, card.height, CARD_RADIUS);
+  ctx.lineWidth = 3;
   ctx.stroke();
 
   drawMonster(ctx, x + CARD_PADDING, y + CARD_PADDING, ICON_SIZE, card.color);
@@ -284,34 +303,34 @@ interface HeaderContent {
 
 const treeBannerSize = (tree: HTMLImageElement) => {
   const aspect = tree.naturalWidth / tree.naturalHeight || 16 / 9;
-  let width = 600;
+  let width = TREE_MAX_WIDTH;
   let height = width / aspect;
-  if (height > 340) {
-    height = 340;
+  if (height > TREE_MAX_HEIGHT) {
+    height = TREE_MAX_HEIGHT;
     width = height * aspect;
   }
   return { width, height };
 };
 
 const firstHeaderHeight = (header: HeaderContent) =>
-  72 +
-  (header.tree ? treeBannerSize(header.tree).height + 28 : 0) +
+  MARGIN_TOP +
+  (header.tree ? treeBannerSize(header.tree).height + 24 : 0) +
   TYPE.title.lineHeight +
   header.subtitleLines.length * TYPE.subtitle.lineHeight +
   TYPE.date.lineHeight +
-  52;
+  48;
 
-const CONTINUED_HEADER_HEIGHT = 64 + TYPE.continued.lineHeight + 40;
+const CONTINUED_HEADER_HEIGHT = MARGIN_TOP + TYPE.continued.lineHeight + 40;
 
 const drawFirstHeader = (ctx: Ctx, header: HeaderContent) => {
-  const centerX = IMAGE_WIDTH / 2;
-  let y = 72;
+  const centerX = PAGE_W / 2;
+  let y = MARGIN_TOP;
   ctx.textAlign = 'center';
 
   if (header.tree) {
     const { width, height } = treeBannerSize(header.tree);
     ctx.drawImage(header.tree, centerX - width / 2, y, width, height);
-    y += height + 28;
+    y += height + 24;
   }
 
   ctx.fillStyle = COLOR.title;
@@ -336,20 +355,25 @@ const drawContinuedHeader = (ctx: Ctx, title: string) => {
   ctx.textAlign = 'center';
   ctx.fillStyle = COLOR.title;
   ctx.font = font(TYPE.continued.size);
-  drawLine(ctx, `${title} · 이어서`, IMAGE_WIDTH / 2, 64, TYPE.continued.size, TYPE.continued.lineHeight);
+  drawLine(ctx, `${title} · 이어서`, PAGE_W / 2, MARGIN_TOP, TYPE.continued.size, TYPE.continued.lineHeight);
   ctx.textAlign = 'left';
 };
 
-const drawFooter = (ctx: Ctx, pageHeight: number, page: number, pageCount: number) => {
-  let y = pageHeight - footerHeight(pageCount) + 24;
-  ctx.textAlign = 'center';
+const drawFooter = (ctx: Ctx, page: number, pageCount: number) => {
+  const y = PAGE_H - FOOTER_HEIGHT + 24;
+  ctx.strokeStyle = COLOR.rule;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(MARGIN_X, y - 12);
+  ctx.lineTo(PAGE_W - MARGIN_X, y - 12);
+  ctx.stroke();
+
   ctx.fillStyle = COLOR.faint;
   ctx.font = font(TYPE.footer.size);
-  drawLine(ctx, '걱정 나무에서 건넨 위로', IMAGE_WIDTH / 2, y, TYPE.footer.size, TYPE.footer.lineHeight);
-  y += TYPE.footer.lineHeight;
-  if (pageCount > 1) {
-    drawLine(ctx, `${page} / ${pageCount}`, IMAGE_WIDTH / 2, y, TYPE.footer.size, TYPE.footer.lineHeight);
-  }
+  ctx.textAlign = 'left';
+  drawLine(ctx, '걱정 나무에서 건넨 위로', MARGIN_X, y + 8, TYPE.footer.size, TYPE.footer.lineHeight);
+  ctx.textAlign = 'right';
+  drawLine(ctx, `${page} / ${pageCount}`, PAGE_W - MARGIN_X, y + 8, TYPE.footer.size, TYPE.footer.lineHeight);
   ctx.textAlign = 'left';
 };
 
@@ -383,109 +407,123 @@ const loadImage = async (src: string): Promise<HTMLImageElement | null> => {
   }
 };
 
-const canvasToBlob = (canvas: HTMLCanvasElement) =>
-  new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('이미지 변환 실패'))), 'image/png');
+const canvasToJpeg = (canvas: HTMLCanvasElement) =>
+  new Promise<Uint8Array>((resolve, reject) => {
+    canvas.toBlob(
+      blob => {
+        if (!blob) {
+          reject(new Error('쪽 그림 변환 실패'));
+          return;
+        }
+        blob.arrayBuffer().then(buffer => resolve(new Uint8Array(buffer)), reject);
+      },
+      'image/jpeg',
+      JPEG_QUALITY,
+    );
   });
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-export interface ComfortImageOptions {
+export interface ComfortPdfOptions {
   items: ClearedWorry[];
   isSharedView: boolean;
-  /** 머리에 넣을 나무 그림. 없거나 못 불러오면 빼고 그립니다. */
+  /** 첫 쪽 머리에 넣을 나무 그림. 없거나 못 불러오면 빼고 그립니다. */
   treeSrc?: string;
   now?: Date;
 }
 
-const renderPages = async (
-  options: ComfortImageOptions,
-  tree: HTMLImageElement | null,
-): Promise<File[]> => {
+export interface ComfortPdf {
+  file: File;
+  pageCount: number;
+}
+
+const TITLE = '따뜻한 위로 기록';
+
+const renderPdf = async (options: ComfortPdfOptions, tree: HTMLImageElement | null): Promise<ComfortPdf> => {
   const { items, isSharedView } = options;
   const now = options.now ?? new Date();
 
-  const measureCanvas = document.createElement('canvas');
-  const measureCtx = measureCanvas.getContext('2d');
+  const measureCtx = document.createElement('canvas').getContext('2d');
   if (!measureCtx) throw new Error('캔버스를 쓸 수 없는 환경입니다.');
 
-  const title = '따뜻한 위로 기록';
   const subtitle = isSharedView
     ? `친구의 걱정 ${items.length}개를 모두 위로했어요`
     : `걱정 ${items.length}개를 모두 위로하고 떠나보냈어요`;
   measureCtx.font = font(TYPE.subtitle.size);
   const header: HeaderContent = {
     tree,
-    title,
+    title: TITLE,
     subtitleLines: wrapText(measureCtx, subtitle, CARD_WIDTH, 2),
     date: new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }).format(now),
   };
 
   const cards = items.map((item, i) => measureCard(measureCtx, item, i));
 
-  // 카드를 쪽에 나눠 담습니다. 카드 하나가 두 쪽에 걸쳐 잘리지 않게 합니다.
-  const pages: { cards: CardLayout[]; height: number }[] = [];
-  let current = { cards: [] as CardLayout[], height: firstHeaderHeight(header) };
+  // 카드를 쪽에 나눠 담습니다. 카드가 쪽 경계에 걸리면 통째로 다음 쪽으로
+  // 넘겨서, 예전처럼 글줄이 반으로 잘리는 일이 없게 합니다.
+  const contentBottom = PAGE_H - FOOTER_HEIGHT;
+  const pages: CardLayout[][] = [];
+  let current: CardLayout[] = [];
+  let y = firstHeaderHeight(header);
   for (const card of cards) {
-    const gap = current.cards.length ? CARD_GAP : 0;
-    if (current.cards.length && current.height + gap + card.height + FOOTER_HEIGHT > MAX_PAGE_HEIGHT) {
+    const gap = current.length ? CARD_GAP : 0;
+    if (current.length && y + gap + card.height > contentBottom) {
       pages.push(current);
-      current = { cards: [], height: CONTINUED_HEADER_HEIGHT };
+      current = [];
+      y = CONTINUED_HEADER_HEIGHT;
     }
-    current.height += (current.cards.length ? CARD_GAP : 0) + card.height;
-    current.cards.push(card);
+    y += (current.length ? CARD_GAP : 0) + card.height;
+    current.push(card);
   }
   pages.push(current);
 
-  const dateStamp = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
-  const files: File[] = [];
-
-  for (const [pageIndex, page] of pages.entries()) {
-    const height = Math.ceil(page.height + footerHeight(pages.length));
+  const pdfPages: PdfPage[] = [];
+  for (const [pageIndex, pageCards] of pages.entries()) {
     const canvas = document.createElement('canvas');
-    canvas.width = IMAGE_WIDTH;
-    canvas.height = height;
+    canvas.width = Math.round(PAGE_W * RENDER_SCALE);
+    canvas.height = Math.round(PAGE_H * RENDER_SCALE);
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('캔버스를 쓸 수 없는 환경입니다.');
+    ctx.scale(RENDER_SCALE, RENDER_SCALE);
     ctx.textBaseline = 'top';
 
-    ctx.fillStyle = COLOR.background;
-    ctx.fillRect(0, 0, IMAGE_WIDTH, height);
+    // JPEG에는 투명이 없어 칠하지 않은 곳은 검게 나옵니다. 바탕을 먼저 칠합니다.
+    ctx.fillStyle = COLOR.page;
+    ctx.fillRect(0, 0, PAGE_W, PAGE_H);
 
-    let y: number;
+    let cardY: number;
     if (pageIndex === 0) {
       drawFirstHeader(ctx, header);
-      y = firstHeaderHeight(header);
+      cardY = firstHeaderHeight(header);
     } else {
-      drawContinuedHeader(ctx, title);
-      y = CONTINUED_HEADER_HEIGHT;
+      drawContinuedHeader(ctx, TITLE);
+      cardY = CONTINUED_HEADER_HEIGHT;
     }
-
-    for (const card of page.cards) {
-      drawCard(ctx, card, y);
-      y += card.height + CARD_GAP;
+    for (const card of pageCards) {
+      drawCard(ctx, card, cardY);
+      cardY += card.height + CARD_GAP;
     }
+    drawFooter(ctx, pageIndex + 1, pages.length);
 
-    drawFooter(ctx, height, pageIndex + 1, pages.length);
-
-    // 파일명은 영문으로 둡니다. 한글이 한 글자라도 섞이면 일부 브라우저가 이름을
-    // 버리고 확장자 없는 'download' 로 저장해 버려, 파일을 열기 어려워집니다.
-    const suffix = pages.length > 1 ? `-${pageIndex + 1}` : '';
-    const blob = await canvasToBlob(canvas);
-    files.push(new File([blob], `worry-tree-comfort-${dateStamp}${suffix}.png`, { type: 'image/png' }));
+    pdfPages.push({ jpeg: await canvasToJpeg(canvas), pixelWidth: canvas.width, pixelHeight: canvas.height });
 
     // 큰 캔버스는 메모리를 많이 차지하므로 바로 비워 줍니다(특히 iOS).
     canvas.width = 0;
     canvas.height = 0;
   }
 
-  return files;
+  const blob = buildPdf(pdfPages, { title: TITLE, createdAt: now });
+  // 파일명은 영문으로 둡니다. 한글이 한 글자라도 섞이면 일부 브라우저가 이름을
+  // 버리고 확장자 없는 'download' 로 저장해 버려, 파일을 열기 어려워집니다.
+  const dateStamp = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+  const file = new File([blob], `worry-tree-comfort-${dateStamp}.pdf`, { type: 'application/pdf' });
+  return { file, pageCount: pages.length };
 };
 
-/** 위로 기록을 PNG 파일(여러 장일 수 있음)로 만듭니다. */
-export const renderComfortImages = async (options: ComfortImageOptions): Promise<File[]> => {
+/** 위로 기록을 A4 PDF 파일 하나로 만듭니다. 쪽이 여러 장이어도 파일은 하나입니다. */
+export const createComfortPdf = async (options: ComfortPdfOptions): Promise<ComfortPdf> => {
   const allText = [
-    '따뜻한 위로 기록 걱정 이어서 건넨 친구의 개를 모두 위로했어요 하고 떠나보냈어요 년월일 나무에서 0123456789/·…',
+    `${TITLE} 걱정 이어서 건넨 친구의 개를 모두 위로했어요 하고 떠나보냈어요 년월일 나무에서 0123456789/·…`,
     ...options.items.flatMap(i => [i.worryText, i.comfortText]),
   ].join(' ');
 
@@ -495,20 +533,51 @@ export const renderComfortImages = async (options: ComfortImageOptions): Promise
   ]);
 
   try {
-    return await renderPages(options, tree);
+    return await renderPdf(options, tree);
   } catch (error) {
     // 나무 그림이 다른 출처에서 와 캔버스가 '오염'되면 저장이 막힙니다.
     // 그럴 때는 나무 그림만 빼고 다시 그립니다.
     if (tree && error instanceof DOMException && error.name === 'SecurityError') {
-      return renderPages(options, null);
+      return renderPdf(options, null);
     }
     throw error;
   }
 };
 
-export type SaveResult = 'shared' | 'downloaded' | 'cancelled';
+export type ShareResult = 'shared' | 'cancelled' | 'unavailable';
 
-const downloadFile = (file: File) => {
+/**
+ * 휴대폰에서는 공유 시트를 엽니다. '파일에 저장'으로 보관하거나 메신저로
+ * 친구·선생님께 바로 보낼 수 있습니다. 쪽이 여러 장이어도 파일은 하나입니다.
+ *
+ * 공유 시트는 버튼을 누른 직후에만 열 수 있어서, PDF는 미리 만들어 두고
+ * 여기서는 곧바로 공유를 호출합니다.
+ *
+ * PC이거나 공유를 쓸 수 없으면 'unavailable' 을 돌려주고, 그때는 다운로드합니다.
+ */
+export const shareFile = async (file: File): Promise<ShareResult> => {
+  const files = [file];
+  const isTouchDevice =
+    typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+  const canShareFiles =
+    typeof navigator !== 'undefined' &&
+    typeof navigator.share === 'function' &&
+    typeof navigator.canShare === 'function' &&
+    navigator.canShare({ files });
+
+  if (!isTouchDevice || !canShareFiles) return 'unavailable';
+  try {
+    await navigator.share({ files });
+    return 'shared';
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return 'cancelled';
+    // 권한 문제 등으로 공유가 막히면 다운로드로 대신합니다.
+    return 'unavailable';
+  }
+};
+
+/** 파일을 내려받습니다. */
+export const downloadFile = (file: File) => {
   const url = URL.createObjectURL(file);
   const link = document.createElement('a');
   link.href = url;
@@ -520,42 +589,5 @@ const downloadFile = (file: File) => {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 };
 
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-/**
- * 만든 이미지를 저장합니다.
- *
- * 휴대폰에서는 공유 시트를 엽니다. 거기서 '이미지 저장'을 누르면 사진첩에 바로
- * 들어가고, 메신저로 친구에게 보낼 수도 있습니다. (휴대폰 브라우저에서 파일을
- * 내려받으면 사진첩이 아니라 '파일' 앱 구석에 들어가 찾기 어렵습니다.)
- * PC에서는 평소처럼 다운로드 폴더에 내려받습니다.
- *
- * 공유 시트는 버튼을 누른 직후에만 열 수 있어서, 이미지는 미리 만들어 두고
- * 이 함수에서는 곧바로 공유를 호출합니다.
- */
-export const saveImages = async (files: File[]): Promise<SaveResult> => {
-  const isTouchDevice =
-    typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
-  const canShareFiles =
-    typeof navigator !== 'undefined' &&
-    typeof navigator.share === 'function' &&
-    typeof navigator.canShare === 'function' &&
-    navigator.canShare({ files });
-
-  if (isTouchDevice && canShareFiles) {
-    try {
-      await navigator.share({ files });
-      return 'shared';
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return 'cancelled';
-      // 권한 문제 등으로 공유가 막히면 다운로드로 대신합니다.
-    }
-  }
-
-  for (const [i, file] of files.entries()) {
-    // 여러 장을 한꺼번에 내려받으면 브라우저가 일부를 막을 수 있어 간격을 둡니다.
-    if (i > 0) await wait(400);
-    downloadFile(file);
-  }
-  return 'downloaded';
-};
+/** 테스트와 점검에 쓰는 쪽 크기 정보 */
+export const PDF_LAYOUT = { PAGE_W, PAGE_H, RENDER_SCALE, A4_POINTS };
